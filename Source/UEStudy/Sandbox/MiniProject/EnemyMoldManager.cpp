@@ -283,7 +283,7 @@ void AEnemyMoldManager::UpdateAttackTickets(const ASpaceDrifterPawn* PlayerPawn,
 		{
 			continue;
 		}
-		Candidates.Add({ Enemy, FVector::Distance(Enemy->GetActorLocation(), PlayerLoc) });
+		Candidates.Add({ Enemy, static_cast<float>(FVector::Distance(Enemy->GetActorLocation(), PlayerLoc)) });
 	}
 	Candidates.Sort([](const FCandidateInfo& A, const FCandidateInfo& B)
 	{

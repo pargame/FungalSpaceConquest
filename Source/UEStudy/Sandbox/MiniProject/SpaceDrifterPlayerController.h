@@ -87,6 +87,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Input Mappings")
 	TArray<TObjectPtr<UInputMappingContext>> DefaultMappingContexts;
 
+	/** 템플릿 IMC보다 항상 최우선으로 평가할 미니프로젝트 전용 입력 매핑 컨텍스트입니다(Priority 100 부여). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Input Mappings")
+	TSoftObjectPtr<UInputMappingContext> HighPriorityMappingContext = TSoftObjectPtr<UInputMappingContext>(
+		FSoftObjectPath(TEXT("/Game/Sandbox/MiniProject/Input/IMC_MiniProject.IMC_MiniProject"))
+	);
+
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;

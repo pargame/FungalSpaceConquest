@@ -1854,6 +1854,42 @@ void USpaceDrifterHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 		{
 			const bool bFocused = NameInputTextBox.IsValid() && NameInputTextBox->HasKeyboardFocus();
 			PC->SetNameInputFocused(bFocused);
+
+			if (PC->IsInTitleScreen())
+			{
+				// Cocoa IME setMarkedText 블록 밖(NativeTick)에서 안전하게 SetText 및 타이틀 종료 처리
+				if (bPendingSanitizeNameInput)
+				{
+					bPendingSanitizeNameInput = false;
+					if (NameInputTextBox.IsValid())
+					{
+						const FString Sanitized = GetSanitizedNameInputText();
+						if (NameInputTextBox->GetText().ToString() != Sanitized)
+						{
+							NameInputTextBox->SetText(FText::FromString(Sanitized));
+						}
+					}
+				}
+
+				if (bPendingTitleStartFromSpace)
+				{
+					bPendingTitleStartFromSpace = false;
+					const FString Sanitized = GetSanitizedNameInputText();
+					if (Sanitized.IsEmpty())
+					{
+						TriggerEmptyNameWarning();
+					}
+					else
+					{
+						PC->StartGameplayFromTitle();
+					}
+				}
+			}
+			else
+			{
+				bPendingSanitizeNameInput = false;
+				bPendingTitleStartFromSpace = false;
+			}
 		}
 	}
 	RefreshTitlePulse(InDeltaTime);
@@ -2969,9 +3005,9 @@ void USpaceDrifterHUDWidget::OnNameTextChanged(const FText& NewText)
 	Sanitized.ReplaceInline(TEXT(" "), TEXT(""));
 	Sanitized.ReplaceInline(TEXT("\t"), TEXT(""));
 
-	if (Sanitized != Raw && NameInputTextBox.IsValid())
+	if (Sanitized != Raw)
 	{
-		NameInputTextBox->SetText(FText::FromString(Sanitized));
+		bPendingSanitizeNameInput = true;
 	}
 
 	if (!Sanitized.IsEmpty() && EmptyNameWarningTimer > 0.0f)
@@ -2991,14 +3027,7 @@ void USpaceDrifterHUDWidget::OnNameTextChanged(const FText& NewText)
 	PC->SetCurrentPlayerName(Sanitized, false);
 	if (bHasSpace)
 	{
-		if (Sanitized.IsEmpty())
-		{
-			TriggerEmptyNameWarning();
-		}
-		else
-		{
-			PC->StartGameplayFromTitle();
-		}
+		bPendingTitleStartFromSpace = true;
 	}
 }
 

@@ -210,5 +210,7 @@ private:
 	float EmptyNameWarningTimer = 0.0f;
 	float CurrentUIScale = 1.0f;
 	bool bPendingInitialNameFocus = true;
+	bool bPendingSanitizeNameInput = false;
+	bool bPendingTitleStartFromSpace = false;
 	bool bReticleTargetInRange = false;
 };

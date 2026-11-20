@@ -79,7 +79,10 @@ void ASpaceDrifterPlayerController::SetupInputComponent()
 			{
 				if (UInputMappingContext* MappingContext = DefaultMappingContexts[Index])
 				{
-					Subsystem->AddMappingContext(MappingContext, Index);
+					const bool bIsHighPriority = !HighPriorityMappingContext.IsNull()
+						&& FSoftObjectPath(MappingContext) == HighPriorityMappingContext.ToSoftObjectPath();
+					const int32 Priority = bIsHighPriority ? 100 : Index;
+					Subsystem->AddMappingContext(MappingContext, Priority);
 				}
 			}
 		}
@@ -341,26 +344,12 @@ void ASpaceDrifterPlayerController::OnTitleConfirmKeyPressed()
 			DrifterPawn->RestartCurrentLevel();
 			return;
 		}
-
-		// 인게임 플레이 중 스페이스바 직접 촉수 발사 보장 (EnhancedInput 누락 방지)
-		DrifterPawn->SetTendrilExtending(true);
 	}
 }
 
 void ASpaceDrifterPlayerController::OnTitleConfirmKeyReleased()
 {
 	bSuppressTendrilUntilSpaceRelease = false;
-
-	if (!bIsInTitleScreen && !bIsPauseMenuOpen)
-	{
-		if (ASpaceDrifterPawn* DrifterPawn = Cast<ASpaceDrifterPawn>(GetPawn()))
-		{
-			if (!DrifterPawn->IsRunEnded())
-			{
-				DrifterPawn->SetTendrilExtending(false);
-			}
-		}
-	}
 }
 
 void ASpaceDrifterPlayerController::OnPauseMenuKeyPressed()

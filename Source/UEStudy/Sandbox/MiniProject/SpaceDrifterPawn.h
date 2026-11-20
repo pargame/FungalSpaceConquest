@@ -5,6 +5,8 @@
 #include "SpaceTendrilHostInterface.h"
 #include "SpaceDrifterPawn.generated.h"
 
+struct FSpaceRunStats;
+
 class USphereComponent;
 class USceneComponent;
 class UStaticMeshComponent;
@@ -330,7 +332,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SpaceDrifter|Scenario")
 	int32 DefeatedEnemyCount = 0;
 
-	/** 클리어(승리) 조건이 되는 목표 포식자 처치 수입니다. */
+	/** [클리어 판정에는 사용 안 함] 클리어 조건은 Project Settings > Game > Fungal Space Rules 에서 설정합니다. 조건에 처치 수가 없을 때 HUD "처치 x/목표" 표시용 기본값으로만 쓰입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SpaceDrifter|Scenario", meta = (ClampMin = "1", ClampMax = "100"))
 	int32 TargetVictoryEnemyCount = 10;
 
@@ -340,7 +342,7 @@ public:
 
 	/** V3 긴급 탈출 분사를 해금하기 위해 필요한 적 포식자 처치 수입니다(0이면 시작부터 해금). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SpaceDrifter|Unlock", meta = (ClampMin = "0", ClampMax = "100"))
-	int32 V3UnlockDefeatedEnemyCount = 5;
+	int32 V3UnlockDefeatedEnemyCount = 3;
 
 	/** 지정한 촉수 능력이 현재 해금 상태인지 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "SpaceDrifter|Unlock")
@@ -375,6 +377,17 @@ public:
 
 	/** 현재 판을 종료하고 리더보드에 점수를 등록합니다. */
 	void EndRun(ESpaceRunState NewState);
+
+	/** Project Settings > Game > Fungal Space Rules 의 클리어 조건을 평가해 만족하면 Victory로 종료합니다. */
+	UFUNCTION(BlueprintCallable, Category = "SpaceDrifter|Scenario")
+	bool CheckClearConditions();
+
+	/** 클리어 판정용 현재 판 지표 스냅샷입니다. */
+	FSpaceRunStats GetRunStats() const;
+
+	/** 클리어 조건 설명 문구입니다(예: "포식자 처치 6마리 이상 + 미네랄 200개 이상"). */
+	UFUNCTION(BlueprintPure, Category = "SpaceDrifter|Scenario")
+	FString GetClearConditionDescription() const;
 
 	/** 현재 레벨을 다시 열어 다음 도전을 시작합니다. */
 	void RestartCurrentLevel();

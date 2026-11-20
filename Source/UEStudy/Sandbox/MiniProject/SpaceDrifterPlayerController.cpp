@@ -309,7 +309,8 @@ void ASpaceDrifterPlayerController::StartGameplayFromTitle()
 		if (HUDWidgetInstance)
 		{
 			HUDWidgetInstance->SetStatusBannerMessage(
-				FString::Printf(TEXT("[%s] 포식자 10마리 타임어택 시작! 빠르게 성장해 역포식하세요!"), *GetCurrentPlayerName()),
+				FString::Printf(TEXT("[%s] 타임어택 시작! 목표: %s"), *GetCurrentPlayerName(),
+					*USpaceDrifterGameRulesSettings::Get()->DescribeClearConditions()),
 				FLinearColor(0.38f, 0.96f, 0.80f, 1.0f),
 				3.0f
 			);

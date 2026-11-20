@@ -16,7 +16,8 @@ public class UEStudy : ModuleRules
 			"Slate",
 			"SlateCore",
 			"PhysicsCore",
-			"ProceduralMeshComponent"
+			"ProceduralMeshComponent",
+			"DeveloperSettings"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "Kismet/GameplayStatics.h"
+#include "SpaceDrifterGameRules.h"
 #include "SpaceDrifterLeaderboardSave.generated.h"
 
 USTRUCT(BlueprintType)
@@ -26,7 +27,7 @@ struct FSpaceLeaderboardEntry
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	int32 AbsorbedMinerals = 0;
 
-	/** 포식자 목표 수(10마리) 완주 성공 여부입니다. */
+	/** 클리어 조건(Project Settings > Fungal Space Rules) 달성 여부입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	bool bClearedGoal = false;
 
@@ -78,30 +79,13 @@ public:
 		return Cast<USpaceDrifterLeaderboardSave>(UGameplayStatics::CreateSaveGameObject(USpaceDrifterLeaderboardSave::StaticClass()));
 	}
 
+	/** Project Settings > Game > Fungal Space Rules 의 LeaderboardSortKeys 순서로 정렬합니다. */
 	void SortEntries()
 	{
-		Entries.Sort([](const FSpaceLeaderboardEntry& A, const FSpaceLeaderboardEntry& B)
+		const USpaceDrifterGameRulesSettings* Rules = USpaceDrifterGameRulesSettings::Get();
+		Entries.StableSort([Rules](const FSpaceLeaderboardEntry& A, const FSpaceLeaderboardEntry& B)
 		{
-			if (A.bClearedGoal != B.bClearedGoal)
-			{
-				return A.bClearedGoal;
-			}
-			if (A.bClearedGoal && B.bClearedGoal)
-			{
-				if (!FMath::IsNearlyEqual(A.ClearTimeSeconds, B.ClearTimeSeconds, 0.005f))
-				{
-					return A.ClearTimeSeconds < B.ClearTimeSeconds;
-				}
-			}
-			if (A.DefeatedEnemies != B.DefeatedEnemies)
-			{
-				return A.DefeatedEnemies > B.DefeatedEnemies;
-			}
-			if (A.AbsorbedMinerals != B.AbsorbedMinerals)
-			{
-				return A.AbsorbedMinerals > B.AbsorbedMinerals;
-			}
-			return A.MaxRadiusMeters > B.MaxRadiusMeters;
+			return Rules->LeaderboardLess(A, B);
 		});
 	}
 
@@ -119,9 +103,10 @@ public:
 
 		Entries.Add(EntryToAdd);
 		SortEntries();
-		if (Entries.Num() > 20)
+		const int32 MaxEntries = FMath::Max(USpaceDrifterGameRulesSettings::Get()->MaxLeaderboardEntries, 1);
+		if (Entries.Num() > MaxEntries)
 		{
-			Entries.SetNum(20);
+			Entries.SetNum(MaxEntries);
 		}
 		UGameplayStatics::SaveGameToSlot(this, SaveSlotName, SaveUserIndex);
 	}

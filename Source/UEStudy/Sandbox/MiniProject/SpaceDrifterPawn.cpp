@@ -18,6 +18,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "SpaceDrifterGameRules.h"
 #include "SpaceDrifterHUDWidget.h"
 #include "SpaceDrifterLeaderboardSave.h"
 #include "SpaceDrifterPlayerController.h"
@@ -160,6 +161,7 @@ void ASpaceDrifterPawn::Tick(float DeltaTime)
 		if (!bInTitle)
 		{
 			ElapsedSurvivalSeconds += DeltaTime;
+			CheckClearConditions(); // 시간·반지름 기반 조건도 판정되도록 매 틱 평가
 		}
 	}
 
@@ -1074,6 +1076,8 @@ void ASpaceDrifterPawn::NotifyMineralAbsorbed(ASpaceMineral* AbsorbedMineral, co
 		FLinearColor(0.42f, 0.98f, 0.85f, 1.0f),
 		1.5f
 	);
+
+	CheckClearConditions();
 }
 
 void ASpaceDrifterPawn::ApplyChaosPhysicsSettings()
@@ -1317,9 +1321,8 @@ void ASpaceDrifterPawn::NotifyEnemyDefeatedByPlayer()
 	const bool bUnlockedV2Now = !bWasV2Unlocked && IsTendrilStyleUnlocked(ETendrilVisualStyle::GossamerSpores);
 	const bool bUnlockedV3Now = !bWasV3Unlocked && IsTendrilStyleUnlocked(ETendrilVisualStyle::SporeJet);
 
-	if (DefeatedEnemyCount >= FMath::Max(TargetVictoryEnemyCount, 1))
+	if (CheckClearConditions())
 	{
-		EndRun(ESpaceRunState::Victory);
 		return;
 	}
 
@@ -1340,6 +1343,44 @@ void ASpaceDrifterPawn::NotifyEnemyDefeatedByPlayer()
 			}
 		}
 	}
+}
+
+bool ASpaceDrifterPawn::CheckClearConditions()
+{
+	if (IsRunEnded() || bIsGameOver)
+	{
+		return false;
+	}
+	if (const ASpaceDrifterPlayerController* PC = Cast<ASpaceDrifterPlayerController>(GetController()))
+	{
+		if (PC->IsInTitleScreen())
+		{
+			return false;
+		}
+	}
+
+	if (USpaceDrifterGameRulesSettings::Get()->IsClearSatisfied(GetRunStats()))
+	{
+		EndRun(ESpaceRunState::Victory);
+		return true;
+	}
+	return false;
+}
+
+FSpaceRunStats ASpaceDrifterPawn::GetRunStats() const
+{
+	FSpaceRunStats Stats;
+	Stats.DefeatedEnemies = DefeatedEnemyCount;
+	Stats.AbsorbedMinerals = ConsumedMineralCount;
+	Stats.MaxRadiusMeters = MaxReachedBodyRadiusCm * 0.01f;
+	Stats.CurrentRadiusMeters = CurrentBodyRadiusCm * 0.01f;
+	Stats.ElapsedSeconds = ElapsedSurvivalSeconds;
+	return Stats;
+}
+
+FString ASpaceDrifterPawn::GetClearConditionDescription() const
+{
+	return USpaceDrifterGameRulesSettings::Get()->DescribeClearConditions();
 }
 
 void ASpaceDrifterPawn::EndRun(ESpaceRunState NewState)

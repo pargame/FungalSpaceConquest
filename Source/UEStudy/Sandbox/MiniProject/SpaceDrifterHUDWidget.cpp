@@ -296,7 +296,8 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 							SNew(STextBlock)
 							.Font(HeroSubTitleFont)
 							.ColorAndOpacity(FSlateColor(FLinearColor(0.65f, 0.78f, 0.92f, 0.90f)))
-							.Text(FText::FromString(TEXT("FUNGAL SPACE CONQUEST  ·  성장해서 포식자 10마리를 최단 시간 안에 모두 먹어치워라!")))
+							.Text(FText::FromString(FString::Printf(TEXT("FUNGAL SPACE CONQUEST  ·  목표: %s  (최단 시간 도전!)"),
+								*USpaceDrifterGameRulesSettings::Get()->DescribeClearConditions())))
 						]
 
 						+ SVerticalBox::Slot()
@@ -352,7 +353,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 								.AutoHeight()
 								.Padding(0.0f, 3.0f)
 								[
-									MakeGuideLine(TEXT("3번 키"), TEXT("V3 긴급 탈출 — 단발 초고속 분사 탈출 · 가용 8% 소모 (5처치 해금)"))
+									MakeGuideLine(TEXT("3번 키"), TEXT("V3 긴급 탈출 — 단발 초고속 분사 탈출 · 가용 8% 소모 (3처치 해금)"))
 								]
 
 								+ SVerticalBox::Slot()
@@ -559,7 +560,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 								SNew(STextBlock)
 								.Font(MicroHeaderFont)
 								.ColorAndOpacity(FSlateColor(FLinearColor(0.62f, 0.74f, 0.86f, 0.90f)))
-								.Text(FText::FromString(TEXT("10마리 완주 최단 시간순 (미완주는 처치 수 순)")))
+								.Text(FText::FromString(USpaceDrifterGameRulesSettings::Get()->DescribeLeaderboardSort()))
 							]
 
 							+ SVerticalBox::Slot()
@@ -1152,7 +1153,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 				]
 			]
 
-			// [구역 G: 좌상단] 5분 타임어택 & 점수 카드
+			// [구역 G: 좌상단] 5분 타임어택 & 점수 카드 + 클리어 조건(OBJECTIVES) 카드
 			+ SOverlay::Slot()
 			.HAlign(HAlign_Left)
 			.VAlign(VAlign_Top)
@@ -1160,6 +1161,9 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 			[
 				SNew(SBox)
 				.WidthOverride(228.0f)
+				[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(SBorder)
 					.BorderImage(WhiteBrush)
@@ -1200,6 +1204,28 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 							.Text(FText::FromString(TEXT("SCORE  0  (적 처치)")))
 						]
 					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 8.0f, 0.0f, 0.0f)
+				[
+					SNew(SBorder)
+					.BorderImage(WhiteBrush)
+					.BorderBackgroundColor(FLinearColor(0.03f, 0.05f, 0.09f, 0.82f))
+					.Padding(FMargin(16.0f, 10.0f))
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 4.0f)
+						[
+							SNew(STextBlock)
+							.Font(MicroHeaderFont)
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.36f, 0.86f, 1.0f, 0.95f)))
+							.Text(FText::FromString(TEXT("CLEAR OBJECTIVES")))
+						]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SAssignNew(ObjectiveListBox, SVerticalBox)
+						]
+					]
+				]
 				]
 			]
 
@@ -1354,22 +1380,23 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 			.VAlign(VAlign_Center)
 			[
 				SNew(SBox)
-				.WidthOverride(560.0f)
+				.WidthOverride(680.0f)
 				[
 					SNew(SBorder)
 					.BorderImage(WhiteBrush)
-					.BorderBackgroundColor(FLinearColor(0.04f, 0.06f, 0.11f, 0.94f))
-					.Padding(FMargin(36.0f, 28.0f))
+					.BorderBackgroundColor(FLinearColor(0.04f, 0.06f, 0.11f, 0.95f))
+					.Padding(FMargin(32.0f, 24.0f))
 					[
 						SNew(SVerticalBox)
 
 						+ SVerticalBox::Slot()
 						.AutoHeight()
 						.HAlign(HAlign_Center)
-						.Padding(0.0f, 0.0f, 0.0f, 6.0f)
+						.Padding(0.0f, 0.0f, 0.0f, 4.0f)
 						[
 							SAssignNew(EndTitleTextBlock, STextBlock)
 							.Font(HeroTitleFont)
+							.Justification(ETextJustify::Center)
 							.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.34f, 0.38f, 1.0f)))
 							.Text(FText::FromString(TEXT("GAME OVER")))
 						]
@@ -1377,23 +1404,153 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 						+ SVerticalBox::Slot()
 						.AutoHeight()
 						.HAlign(HAlign_Center)
-						.Padding(0.0f, 0.0f, 0.0f, 12.0f)
+						.Padding(0.0f, 0.0f, 0.0f, 10.0f)
 						[
 							SAssignNew(EndSubTitleTextBlock, STextBlock)
 							.Font(HeroSubTitleFont)
+							.Justification(ETextJustify::Center)
+							.AutoWrapText(true)
+							.WrapTextAt(590.0f)
 							.ColorAndOpacity(FSlateColor(FLinearColor(0.88f, 0.92f, 0.98f, 0.95f)))
 							.Text(FText::FromString(TEXT("점수가 리더보드에 등록되었습니다!")))
 						]
 
+						// 플레이어 이름 배지
 						+ SVerticalBox::Slot()
 						.AutoHeight()
 						.HAlign(HAlign_Center)
-						.Padding(0.0f, 0.0f, 0.0f, 16.0f)
+						.Padding(0.0f, 0.0f, 0.0f, 12.0f)
 						[
-							SAssignNew(GameOverStatsTextBlock, STextBlock)
-							.Font(HUDStatFont)
-							.ColorAndOpacity(FSlateColor(FLinearColor(0.45f, 0.98f, 0.80f, 1.0f)))
-							.Text(FText::FromString(TEXT("처치 점수: 0  |  최대 반지름: 0.75 m  |  흡수 미네랄: 0 개")))
+							SNew(SBorder)
+							.BorderImage(WhiteBrush)
+							.BorderBackgroundColor(FLinearColor(0.08f, 0.16f, 0.24f, 0.92f))
+							.Padding(FMargin(16.0f, 5.0f))
+							[
+								SAssignNew(EndPlayerNameTextBlock, STextBlock)
+								.Font(SectionTitleFont)
+								.ColorAndOpacity(FSlateColor(FLinearColor(0.55f, 0.96f, 0.88f, 1.0f)))
+								.Text(FText::FromString(TEXT("PLAYER  ·  익명 곰팡이")))
+							]
+						]
+
+						// 2x2 구조화 결과 스탯 카드 그리드 (1행: 소요 시간 / 포식자 처치)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 0.0f, 0.0f, 8.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+							[
+								SNew(SBorder)
+								.BorderImage(WhiteBrush)
+								.BorderBackgroundColor(FLinearColor(0.07f, 0.11f, 0.18f, 0.94f))
+								.Padding(FMargin(14.0f, 10.0f))
+								[
+									SNew(SVerticalBox)
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
+									[
+										SNew(STextBlock)
+										.Font(MicroHeaderFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.64f, 0.78f, 0.92f, 0.90f)))
+										.Text(FText::FromString(TEXT("소요 시간")))
+									]
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+									[
+										SAssignNew(EndStatValueTexts[0], STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.88f, 0.36f, 1.0f)))
+										.Text(FText::FromString(TEXT("00:00.0")))
+									]
+								]
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(4.0f, 0.0f, 0.0f, 0.0f)
+							[
+								SNew(SBorder)
+								.BorderImage(WhiteBrush)
+								.BorderBackgroundColor(FLinearColor(0.07f, 0.11f, 0.18f, 0.94f))
+								.Padding(FMargin(14.0f, 10.0f))
+								[
+									SNew(SVerticalBox)
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
+									[
+										SNew(STextBlock)
+										.Font(MicroHeaderFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.64f, 0.78f, 0.92f, 0.90f)))
+										.Text(FText::FromString(TEXT("포식자 처치")))
+									]
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+									[
+										SAssignNew(EndStatValueTexts[1], STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.52f, 0.56f, 1.0f)))
+										.Text(FText::FromString(TEXT("0 마리")))
+									]
+								]
+							]
+						]
+
+						// 2x2 구조화 결과 스탯 카드 그리드 (2행: 최대 반지름 / 흡수 미네랄)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 0.0f, 0.0f, 14.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(0.0f, 0.0f, 4.0f, 0.0f)
+							[
+								SNew(SBorder)
+								.BorderImage(WhiteBrush)
+								.BorderBackgroundColor(FLinearColor(0.07f, 0.11f, 0.18f, 0.94f))
+								.Padding(FMargin(14.0f, 10.0f))
+								[
+									SNew(SVerticalBox)
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
+									[
+										SNew(STextBlock)
+										.Font(MicroHeaderFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.64f, 0.78f, 0.92f, 0.90f)))
+										.Text(FText::FromString(TEXT("최대 반지름")))
+									]
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+									[
+										SAssignNew(EndStatValueTexts[2], STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.45f, 0.96f, 0.80f, 1.0f)))
+										.Text(FText::FromString(TEXT("0.75 m")))
+									]
+								]
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(4.0f, 0.0f, 0.0f, 0.0f)
+							[
+								SNew(SBorder)
+								.BorderImage(WhiteBrush)
+								.BorderBackgroundColor(FLinearColor(0.07f, 0.11f, 0.18f, 0.94f))
+								.Padding(FMargin(14.0f, 10.0f))
+								[
+									SNew(SVerticalBox)
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.0f, 0.0f, 0.0f, 3.0f)
+									[
+										SNew(STextBlock)
+										.Font(MicroHeaderFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.64f, 0.78f, 0.92f, 0.90f)))
+										.Text(FText::FromString(TEXT("흡수 미네랄")))
+									]
+									+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+									[
+										SAssignNew(EndStatValueTexts[3], STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.36f, 0.92f, 1.0f, 1.0f)))
+										.Text(FText::FromString(TEXT("0 개")))
+									]
+								]
+							]
 						]
 
 						+ SVerticalBox::Slot()
@@ -1403,7 +1560,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 							SNew(SBorder)
 							.BorderImage(WhiteBrush)
 							.BorderBackgroundColor(FLinearColor(0.06f, 0.09f, 0.15f, 0.90f))
-							.Padding(FMargin(18.0f, 14.0f))
+							.Padding(FMargin(16.0f, 12.0f))
 							[
 								SNew(SVerticalBox)
 								+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 0.0f, 0.0f, 8.0f)
@@ -1449,8 +1606,9 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 						[
 							SNew(STextBlock)
 							.Font(TitlePromptMainFont)
+							.Justification(ETextJustify::Center)
 							.ColorAndOpacity(FSlateColor(FLinearColor(0.45f, 1.0f, 0.82f, 1.0f)))
-							.Text(FText::FromString(TEXT("[ SPACE ]  타이틀로 돌아가기 / 다음 도전")))
+							.Text(FText::FromString(TEXT("SPACE  ·  타이틀로 돌아가기")))
 						]
 					]
 				]
@@ -1769,6 +1927,11 @@ void USpaceDrifterHUDWidget::ReleaseSlateResources(bool bReleaseChildren)
 	MatchTimerTextBlock.Reset();
 	MatchScoreTextBlock.Reset();
 	MatchPlayerNameTextBlock.Reset();
+	ObjectiveListBox.Reset();
+	ObjectiveMarkTexts.Reset();
+	ObjectiveLabelTexts.Reset();
+	ObjectiveProgressTexts.Reset();
+	ObjectiveLayoutSignature.Reset();
 
 	BiomassValueTextBlock.Reset();
 	BiomassAbsTextBlock.Reset();
@@ -1819,6 +1982,11 @@ void USpaceDrifterHUDWidget::ReleaseSlateResources(bool bReleaseChildren)
 	}
 	EndTitleTextBlock.Reset();
 	EndSubTitleTextBlock.Reset();
+	EndPlayerNameTextBlock.Reset();
+	for (int32 i = 0; i < 4; ++i)
+	{
+		EndStatValueTexts[i].Reset();
+	}
 	GameOverStatsTextBlock.Reset();
 	EndLeaderboardListBox.Reset();
 
@@ -2512,17 +2680,21 @@ void USpaceDrifterHUDWidget::RefreshHUDTexts()
 		ReachRangeTextBlock->SetText(FText::FromString(FString::Printf(TEXT("REACH %.1fm"), EffectiveReachM)));
 	}
 
+	const USpaceDrifterGameRulesSettings* Rules = USpaceDrifterGameRulesSettings::Get();
+
 	if (MineralValueTextBlock.IsValid())
 	{
 		MineralValueTextBlock->SetText(FText::FromString(FString::Printf(TEXT("%d"), Pawn->ConsumedMineralCount)));
 	}
+
+	// 클리어 조건은 OBJECTIVES 카드 한곳에서만 진행도 표시
+	RefreshObjectivePanel(Pawn);
 
 	const float ElapsedSec = FMath::Max(Pawn->ElapsedSurvivalSeconds, 0.0f);
 	const int32 TotalTenths = FMath::FloorToInt(ElapsedSec * 10.0f);
 	const int32 Mins = (TotalTenths / 10) / 60;
 	const int32 Secs = (TotalTenths / 10) % 60;
 	const int32 Tenths = TotalTenths % 10;
-	const int32 TargetKills = FMath::Max(Pawn->TargetVictoryEnemyCount, 1);
 
 	if (MatchTimerTextBlock.IsValid())
 	{
@@ -2535,7 +2707,7 @@ void USpaceDrifterHUDWidget::RefreshHUDTexts()
 		const int32 ActivePredators = EnemyMgr ? EnemyMgr->GetActiveEnemyCount() : 0;
 		const int32 TargetPredators = EnemyMgr ? EnemyMgr->GetCurrentTargetActiveEnemyCount(Pawn) : 1;
 		MatchScoreTextBlock->SetText(FText::FromString(FString::Printf(
-			TEXT("처치 %d/%d  ·  활성 %d/%d"), Pawn->DefeatedEnemyCount, TargetKills, ActivePredators, TargetPredators)));
+			TEXT("처치 %d  ·  활성 %d/%d"), Pawn->DefeatedEnemyCount, ActivePredators, TargetPredators)));
 	}
 	if (MatchPlayerNameTextBlock.IsValid())
 	{
@@ -2552,26 +2724,135 @@ void USpaceDrifterHUDWidget::RefreshHUDTexts()
 			EndTitleTextBlock->SetText(FText::FromString(FString::Printf(TEXT("CLEAR!  %02d:%02d.%d"), Mins, Secs, Tenths)));
 			EndTitleTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.28f, 1.0f, 0.78f, 1.0f)));
 			EndSubTitleTextBlock->SetText(FText::FromString(FString::Printf(
-				TEXT("포식자 %d마리 처치 완료! 걸린 시간 %.2f초가 리더보드에 등록되었습니다."), TargetKills, ElapsedSec)));
+				TEXT("%s 달성! 클리어 기록이 리더보드에 등록되었습니다."), *Rules->DescribeClearConditions())));
 		}
 		else
 		{
 			EndTitleTextBlock->SetText(FText::FromString(TEXT("GAME OVER")));
 			EndTitleTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.34f, 0.38f, 1.0f)));
-			EndSubTitleTextBlock->SetText(FText::FromString(FString::Printf(
-				TEXT("생체량이 고갈되었습니다. 처치 %d/%d마리 기록이 리더보드에 등록되었습니다."), Pawn->DefeatedEnemyCount, TargetKills)));
+			EndSubTitleTextBlock->SetText(FText::FromString(
+				TEXT("생체량이 고갈되었습니다. 이번 도전 기록이 리더보드에 등록되었습니다.")));
 		}
 	}
 
+	const FString PlayerName = OwnerPC.IsValid() ? OwnerPC->GetCurrentPlayerName() : TEXT("익명 곰팡이");
+	if (EndPlayerNameTextBlock.IsValid())
+	{
+		EndPlayerNameTextBlock->SetText(FText::FromString(FString::Printf(TEXT("PLAYER  ·  %s"), *PlayerName)));
+	}
+	if (EndStatValueTexts[0].IsValid())
+	{
+		EndStatValueTexts[0]->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d.%d"), Mins, Secs, Tenths)));
+	}
+	if (EndStatValueTexts[1].IsValid())
+	{
+		EndStatValueTexts[1]->SetText(FText::FromString(FString::Printf(TEXT("%d 마리"), Pawn->DefeatedEnemyCount)));
+	}
+	if (EndStatValueTexts[2].IsValid())
+	{
+		EndStatValueTexts[2]->SetText(FText::FromString(FString::Printf(TEXT("%.2f m"), MaxRadiusM)));
+	}
+	if (EndStatValueTexts[3].IsValid())
+	{
+		EndStatValueTexts[3]->SetText(FText::FromString(FString::Printf(TEXT("%d 개"), Pawn->ConsumedMineralCount)));
+	}
 	if (GameOverStatsTextBlock.IsValid())
 	{
-		const FString PlayerName = OwnerPC.IsValid() ? OwnerPC->GetCurrentPlayerName() : TEXT("익명 곰팡이");
 		GameOverStatsTextBlock->SetText(FText::FromString(FString::Printf(
-			TEXT("[%s]  시간: %02d:%02d.%d  |  처치: %d/%d마리  |  최대: %.2f m  |  미네랄: %d개"),
-			*PlayerName, Mins, Secs, Tenths, Pawn->DefeatedEnemyCount, TargetKills, MaxRadiusM, Pawn->ConsumedMineralCount)));
+			TEXT("[%s]  시간: %02d:%02d.%d  |  처치: %d마리  |  최대: %.2f m  |  미네랄: %d개"),
+			*PlayerName, Mins, Secs, Tenths, Pawn->DefeatedEnemyCount, MaxRadiusM, Pawn->ConsumedMineralCount)));
 	}
 
 	UpdateTendrilSlotHighlight(Pawn->TendrilVisualStyle);
+}
+
+void USpaceDrifterHUDWidget::RefreshObjectivePanel(const ASpaceDrifterPawn* Pawn)
+{
+	if (!ObjectiveListBox.IsValid() || !Pawn)
+	{
+		return;
+	}
+
+	TArray<FSpaceObjectiveLine> Lines;
+	USpaceDrifterGameRulesSettings::Get()->BuildObjectiveLines(Pawn->GetRunStats(), Lines);
+
+	// 조건 구성(줄 종류·라벨)이 바뀐 경우에만 행을 다시 생성
+	FString Signature;
+	for (const FSpaceObjectiveLine& Line : Lines)
+	{
+		Signature += Line.bIsHeader ? TEXT("H:") : TEXT("C:");
+		Signature += Line.Label;
+		Signature += TEXT("|");
+	}
+
+	if (Signature != ObjectiveLayoutSignature || ObjectiveLabelTexts.Num() != Lines.Num())
+	{
+		ObjectiveLayoutSignature = Signature;
+		ObjectiveListBox->ClearChildren();
+		ObjectiveMarkTexts.Reset();
+		ObjectiveLabelTexts.Reset();
+		ObjectiveProgressTexts.Reset();
+
+		for (const FSpaceObjectiveLine& Line : Lines)
+		{
+			TSharedPtr<STextBlock> Mark;
+			TSharedPtr<STextBlock> Label;
+			TSharedPtr<STextBlock> Progress;
+
+			ObjectiveListBox->AddSlot()
+				.AutoHeight()
+				.Padding(Line.bIsHeader ? FMargin(0.0f, 2.0f, 0.0f, 1.0f) : FMargin(6.0f, 1.0f, 0.0f, 1.0f))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.0f, 0.0f, 6.0f, 0.0f)
+					[
+						SAssignNew(Mark, STextBlock)
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", Line.bIsHeader ? 9 : 11))
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
+					[
+						SAssignNew(Label, STextBlock)
+						.Font(FCoreStyle::GetDefaultFontStyle(Line.bIsHeader ? "Regular" : "Bold", Line.bIsHeader ? 9 : 11))
+						.Text(FText::FromString(Line.Label))
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.0f, 0.0f, 0.0f, 0.0f)
+					[
+						SAssignNew(Progress, STextBlock)
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+					]
+				];
+
+			ObjectiveMarkTexts.Add(Mark);
+			ObjectiveLabelTexts.Add(Label);
+			ObjectiveProgressTexts.Add(Progress);
+		}
+	}
+
+	const FLinearColor MetColor(0.32f, 1.0f, 0.74f, 1.0f);
+	const FLinearColor PendingColor(0.90f, 0.95f, 1.0f, 0.95f);
+	const FLinearColor HeaderColor(0.58f, 0.72f, 0.86f, 0.90f);
+	const FLinearColor PendingMarkColor(0.50f, 0.60f, 0.72f, 0.85f);
+
+	for (int32 i = 0; i < Lines.Num(); ++i)
+	{
+		const FSpaceObjectiveLine& Line = Lines[i];
+		if (ObjectiveMarkTexts[i].IsValid())
+		{
+			ObjectiveMarkTexts[i]->SetText(FText::FromString(Line.bIsHeader
+				? (Line.bMet ? TEXT("●") : TEXT("○"))
+				: (Line.bMet ? TEXT("■") : TEXT("□"))));
+			ObjectiveMarkTexts[i]->SetColorAndOpacity(FSlateColor(Line.bMet ? MetColor : PendingMarkColor));
+		}
+		if (ObjectiveLabelTexts[i].IsValid())
+		{
+			ObjectiveLabelTexts[i]->SetColorAndOpacity(FSlateColor(Line.bIsHeader ? HeaderColor : (Line.bMet ? MetColor : PendingColor)));
+		}
+		if (ObjectiveProgressTexts[i].IsValid())
+		{
+			ObjectiveProgressTexts[i]->SetText(FText::FromString(Line.Progress));
+			ObjectiveProgressTexts[i]->SetColorAndOpacity(FSlateColor(Line.bMet ? MetColor : PendingColor));
+		}
+	}
 }
 
 void USpaceDrifterHUDWidget::RefreshAimReticle()
@@ -3097,6 +3378,71 @@ void USpaceDrifterHUDWidget::PopulateLeaderboardBox(const TSharedPtr<SVerticalBo
 
 	const FSlateBrush* WhiteBrush = FCoreStyle::Get().GetBrush("WhiteBrush");
 
+	// 현재 프로젝트 규칙(ClearConditionGroups)에 등록된 클리어 조건 지표 목록을 중복 없이 수집
+	const USpaceDrifterGameRulesSettings* Rules = USpaceDrifterGameRulesSettings::Get();
+	TArray<ESpaceClearMetric> ActiveRuleMetrics;
+	if (Rules)
+	{
+		for (const FSpaceClearConditionGroup& Group : Rules->ClearConditionGroups)
+		{
+			if (!Group.bEnabled)
+			{
+				continue;
+			}
+			for (const FSpaceClearCondition& Cond : Group.Conditions)
+			{
+				if (!Cond.bEnabled)
+				{
+					continue;
+				}
+				// CurrentRadiusMeters는 저장 기록에서 MaxRadiusMeters로 통합 표시
+				const ESpaceClearMetric EffectiveMetric = (Cond.Metric == ESpaceClearMetric::CurrentRadiusMeters)
+					? ESpaceClearMetric::MaxRadiusMeters
+					: Cond.Metric;
+				ActiveRuleMetrics.AddUnique(EffectiveMetric);
+			}
+		}
+	}
+	if (ActiveRuleMetrics.IsEmpty())
+	{
+		ActiveRuleMetrics.Add(ESpaceClearMetric::DefeatedEnemies);
+		ActiveRuleMetrics.Add(ESpaceClearMetric::AbsorbedMinerals);
+	}
+
+	auto FormatEntryRuleMetrics = [&ActiveRuleMetrics](const FSpaceLeaderboardEntry& InEntry) -> FString
+	{
+		TArray<FString> Parts;
+		Parts.Reserve(ActiveRuleMetrics.Num());
+		for (const ESpaceClearMetric Metric : ActiveRuleMetrics)
+		{
+			switch (Metric)
+			{
+			case ESpaceClearMetric::DefeatedEnemies:
+				Parts.Add(FString::Printf(TEXT("처치 %d"), InEntry.DefeatedEnemies));
+				break;
+			case ESpaceClearMetric::AbsorbedMinerals:
+				Parts.Add(FString::Printf(TEXT("미네랄 %d"), InEntry.AbsorbedMinerals));
+				break;
+			case ESpaceClearMetric::MaxRadiusMeters:
+			case ESpaceClearMetric::CurrentRadiusMeters:
+				Parts.Add(FString::Printf(TEXT("크기 %.2fm"), InEntry.MaxRadiusMeters));
+				break;
+			case ESpaceClearMetric::ElapsedSeconds:
+			{
+				const int32 TenthsTotal = FMath::FloorToInt(FMath::Max(InEntry.ClearTimeSeconds, 0.0f) * 10.0f);
+				const int32 EM = (TenthsTotal / 10) / 60;
+				const int32 ES = (TenthsTotal / 10) % 60;
+				const int32 ET = TenthsTotal % 10;
+				Parts.Add(FString::Printf(TEXT("시간 %02d:%02d.%d"), EM, ES, ET));
+				break;
+			}
+			default:
+				break;
+			}
+		}
+		return FString::Join(Parts, TEXT(" · "));
+	};
+
 	// 동명이인 시간순 넘버링 산출 (등록 순서 RegistrationOrder 오름차순 기준: 1차, 2차, 3차...)
 	TMap<FString, TArray<int32>> NameToEntryIndices;
 	for (int32 i = 0; i < SaveObj->Entries.Num(); ++i)
@@ -3203,23 +3549,39 @@ void USpaceDrifterHUDWidget::PopulateLeaderboardBox(const TSharedPtr<SVerticalBo
 					.VAlign(VAlign_Center)
 					.Padding(6.0f, 0.0f, 0.0f, 0.0f)
 					[
-						SNew(STextBlock)
-						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
-						.ColorAndOpacity(FSlateColor(Entry.bClearedGoal
-							? FLinearColor(0.32f, 1.0f, 0.80f, 1.0f)
-							: FLinearColor(0.72f, 0.78f, 0.86f, 0.88f)))
-						.Text(FText::FromString([&Entry]()
-						{
-							if (Entry.bClearedGoal)
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Right)
+						[
+							SNew(STextBlock)
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+							.ColorAndOpacity(FSlateColor(Entry.bClearedGoal
+								? FLinearColor(0.32f, 1.0f, 0.80f, 1.0f)
+								: FLinearColor(0.86f, 0.72f, 0.56f, 0.92f)))
+							.Text(FText::FromString([&Entry]()
 							{
 								const int32 TenthsTotal = FMath::FloorToInt(FMath::Max(Entry.ClearTimeSeconds, 0.0f) * 10.0f);
 								const int32 EM = (TenthsTotal / 10) / 60;
 								const int32 ES = (TenthsTotal / 10) % 60;
 								const int32 ET = TenthsTotal % 10;
-								return FString::Printf(TEXT("CLEAR %02d:%02d.%d"), EM, ES, ET);
-							}
-							return FString::Printf(TEXT("처치 %d마리 (미네랄 %d)"), Entry.DefeatedEnemies, Entry.AbsorbedMinerals);
-						}()))
+								if (Entry.bClearedGoal)
+								{
+									return FString::Printf(TEXT("CLEAR %02d:%02d.%d"), EM, ES, ET);
+								}
+								return FString::Printf(TEXT("미달성 %02d:%02d.%d"), EM, ES, ET);
+							}()))
+						]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Right)
+						.Padding(0.0f, 1.0f, 0.0f, 0.0f)
+						[
+							SNew(STextBlock)
+							.Font(FCoreStyle::GetDefaultFontStyle("Regular", 9))
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.72f, 0.84f, 0.96f, 0.90f)))
+							.Text(FText::FromString(FormatEntryRuleMetrics(Entry)))
+						]
 					]
 				]
 			];

@@ -114,6 +114,14 @@ private:
 	TSharedPtr<STextBlock> MatchScoreTextBlock;
 	TSharedPtr<STextBlock> MatchPlayerNameTextBlock;
 
+	// 좌상단 타이머 카드 아래: 클리어 조건(목표) 패널
+	TSharedPtr<SVerticalBox> ObjectiveListBox;
+	TArray<TSharedPtr<STextBlock>> ObjectiveMarkTexts;
+	TArray<TSharedPtr<STextBlock>> ObjectiveLabelTexts;
+	TArray<TSharedPtr<STextBlock>> ObjectiveProgressTexts;
+	FString ObjectiveLayoutSignature;
+	void RefreshObjectivePanel(const class ASpaceDrifterPawn* Pawn);
+
 	// 좌하단: 생체량 & 성장 코어 카드
 	TSharedPtr<STextBlock> BiomassValueTextBlock;
 	TSharedPtr<STextBlock> BiomassAbsTextBlock;
@@ -190,6 +198,8 @@ private:
 	// 종료(5분 완주 / 게임오버) 오버레이
 	TSharedPtr<STextBlock> EndTitleTextBlock;
 	TSharedPtr<STextBlock> EndSubTitleTextBlock;
+	TSharedPtr<STextBlock> EndPlayerNameTextBlock;
+	TSharedPtr<STextBlock> EndStatValueTexts[4];
 	TSharedPtr<STextBlock> GameOverStatsTextBlock;
 	TSharedPtr<SVerticalBox> EndLeaderboardListBox;
 

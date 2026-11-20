@@ -1931,7 +1931,7 @@ void USpaceDrifterHUDWidget::TriggerAbilityUnlockEffect(ETendrilVisualStyle Unlo
 	{
 		UnlockPopupDescTextBlock->SetText(FText::FromString(
 			bIsV3
-				? TEXT("전방 고속 임펄스 긴급 탈출 (쿨타임 6초)  |  3번 키로 전환")
+				? TEXT("전방 고속 임펄스 긴급 탈출 (쿨타임 1초)  |  3번 키로 전환")
 				: TEXT("광역 포식자 둔화 · 크기 -15% 영구 축소  |  2번 키로 전환")
 		));
 	}

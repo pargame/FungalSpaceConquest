@@ -113,6 +113,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "1.0", ClampMax = "6.0"))
 	float MaxDistanceSpeedMultiplier = 2.6f;
 
+	/** 플레이어의 V1 긴 촉수에 붙잡혀(락온) 당겨지거나 흡수되기 시작할 때 포식자의 이동 강도(가속도·최대 속력) 유지 비율(%)입니다(예: 20% = 80% 약화). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "0.0", ClampMax = "100.0"))
+	float LatchedByTendrilMoveStrengthPercent = 20.0f;
+
 	/** 플레이어 이동 방향을 앞질러 추격할 예측 시간(초)입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "0.0", ClampMax = "2.5"))
 	float LeadPursuitSeconds = 0.55f;

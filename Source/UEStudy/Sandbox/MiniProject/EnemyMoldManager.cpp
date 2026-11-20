@@ -7,6 +7,7 @@
 #include "SpaceDrifterPawn.h"
 #include "SpaceDrifterPlayerController.h"
 #include "SpaceEnemyMold.h"
+#include "SpaceTendrilAbility.h"
 #include "TimerManager.h"
 
 AEnemyMoldManager::AEnemyMoldManager()
@@ -473,8 +474,28 @@ void AEnemyMoldManager::Tick(float DeltaTime)
 		const bool bEnemyIsThreat = IsEnemyThreatToPlayer(Enemy, PlayerPawn);
 		Enemy->SetHuntableVisual(!bEnemyIsThreat);
 
-		// V1 전염 진행 중에는 대기 링으로 밀려나지 않도록 조향을 일시 정지
-		if (Enemy->GetColonizationState() != EEnemyMoldColonizationState::Colonizing)
+		// 플레이어의 V1 긴 촉수에 현재 붙잡혀(락온) 있는지 확인
+		const bool bLatchedByPlayerTendril = (PlayerPawn->LongTendrilAbility && PlayerPawn->LongTendrilAbility->GetLatchedTargetActor() == Enemy);
+
+		// V1 전염 진행 중에는 대기 링으로 밀려나지 않도록 조향을 일시 정지하고 잔여 속도를 감쇠
+		if (Enemy->GetColonizationState() == EEnemyMoldColonizationState::Colonizing)
+		{
+			if (USphereComponent* EnemySphere = Enemy->GetCollisionSphere())
+			{
+				if (EnemySphere->IsSimulatingPhysics())
+				{
+					const float LatchedStrength = FMath::Clamp(LatchedByTendrilMoveStrengthPercent, 0.0f, 100.0f) * 0.01f;
+					const float ColonizeMaxSpeed = FMath::Max(MaxChaseSpeedCmPerSec * FMath::Max(LatchedStrength, 0.05f), 25.0f);
+					const FVector CurVel = EnemySphere->GetPhysicsLinearVelocity();
+					const float CurSpeed = CurVel.Size();
+					if (CurSpeed > ColonizeMaxSpeed)
+					{
+						EnemySphere->SetPhysicsLinearVelocity(CurVel * (ColonizeMaxSpeed / CurSpeed));
+					}
+				}
+			}
+		}
+		else
 		{
 			if (USphereComponent* EnemySphere = Enemy->GetCollisionSphere())
 			{
@@ -485,8 +506,13 @@ void AEnemyMoldManager::Tick(float DeltaTime)
 					const float DistanceBoostAlpha = FMath::Clamp((SurfaceDist - DistanceSpeedBoostStartCm) / BoostSpan, 0.0f, 1.0f);
 					const float DistanceSpeedMul = FMath::Lerp(1.0f, FMath::Max(MaxDistanceSpeedMultiplier, 1.0f), DistanceBoostAlpha);
 
-					const float SpeedMul = Enemy->GetMoveSpeedMultiplier() * DistanceSpeedMul;
-					const float EffectiveMaxSpeed = FMath::Max(MaxChaseSpeedCmPerSec * SpeedMul, 40.0f);
+					// V1 긴 촉수에 잡힌 동안에는 거리 가속을 끄고 포식자 이동 강도를 지정 % 비율로 약화
+					const float LatchedMul = bLatchedByPlayerTendril
+						? (FMath::Clamp(LatchedByTendrilMoveStrengthPercent, 0.0f, 100.0f) * 0.01f)
+						: DistanceSpeedMul;
+
+					const float SpeedMul = Enemy->GetMoveSpeedMultiplier() * LatchedMul;
+					const float EffectiveMaxSpeed = FMath::Max(MaxChaseSpeedCmPerSec * SpeedMul, bLatchedByPlayerTendril ? 15.0f : 40.0f);
 					const float EffectiveAccel = ChaseAcceleration * SpeedMul;
 
 					// 모든 활성 포식자(공격 티켓 보유자 포함) 간 최소 표면 이격 거리 유지 반발 벡터 산출

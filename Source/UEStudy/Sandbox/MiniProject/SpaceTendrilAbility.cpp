@@ -13,6 +13,7 @@
 #include "FXSystemComponent.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 #include "SpaceAsteroid.h"
@@ -1027,7 +1028,7 @@ void ULongTendrilAbility::DetachLatchedTarget()
 UNetTendrilAbility::UNetTendrilAbility()
 {
 	RetractSpeed = 1.2f;
-	CooldownSeconds = 6.0f;
+	CooldownSeconds = 7.8f;
 }
 
 void UNetTendrilAbility::LatchCameraAimBasis()
@@ -1257,13 +1258,13 @@ float UNetTendrilAbility::EvaluateFunnelRadiusCm(float NormalizedT, float Curren
 {
 	const float ClampedT = FMath::Clamp(NormalizedT, 0.0f, 1.0f);
 	const float BodyRadius = Host.GetInterface() ? FMath::Max(Host.GetInterface()->GetTendrilBodyRadius(), 20.0f) : 75.0f;
-	const float StartR = BodyRadius * FMath::Max(NetStartSpreadBodyRadiusMultiplier, 0.5f);
+	const float StartR = BodyRadius * FMath::Max(NetStartSpreadBodyRadiusMultiplier, 0.05f);
 	const float MaxR = BodyRadius * FMath::Max(NetMaxSpreadBodyRadiusMultiplier, NetStartSpreadBodyRadiusMultiplier + 0.5f);
 
-	// 낚시배 투망처럼 시작부터 확 넓게 벌어지는 오목 곡선 (pow(t, 0.50))
-	const float BellCurve = FMath::Pow(ClampedT, FMath::Clamp(CastNetBellExponent, 0.2f, 1.5f));
-	const float OpenProgress = FMath::Lerp(0.58f, 1.0f, FMath::Pow(FMath::Clamp(CurrentReachAlpha, 0.0f, 1.0f), 0.45f));
-	return FMath::Lerp(StartR, MaxR, BellCurve) * OpenProgress;
+	// 꼭짓점(StartR)에서 앞쪽 넓은 입구(MaxR)로 자연스럽게 퍼지는 원뿔(Cone) 투망 곡선
+	const float ConeCurve = FMath::Pow(ClampedT, FMath::Clamp(CastNetBellExponent, 0.2f, 1.8f));
+	const float OpenProgress = FMath::Lerp(0.35f, 1.0f, FMath::Pow(FMath::Clamp(CurrentReachAlpha, 0.0f, 1.0f), 0.65f));
+	return FMath::Lerp(StartR, MaxR * OpenProgress, ConeCurve);
 }
 
 UProceduralMeshComponent* UNetTendrilAbility::EnsureCastNetMeshComponent()
@@ -1296,16 +1297,27 @@ UProceduralMeshComponent* UNetTendrilAbility::EnsureCastNetMeshComponent()
 
 	if (!CachedCastNetMaterial.IsValid())
 	{
-		UMaterialInterface* LoadedMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Sandbox/MiniProject/Materials/M_MyceliumRibbon.M_MyceliumRibbon"));
-		if (!LoadedMat)
+		// M_SpaceMineral은 UProceduralMeshComponent에서 Emissive 발광이 검증된 머티리얼입니다(M_MyceliumRibbon은 나이아가라 리본 전용이라 프로시저럴 메시에서 투명해짐)
+		UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Sandbox/MiniProject/Materials/M_SpaceMineral.M_SpaceMineral"));
+		if (!BaseMat)
 		{
-			LoadedMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Sandbox/MiniProject/Materials/M_SpaceMineral.M_SpaceMineral"));
+			BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 		}
-		if (!LoadedMat)
+		if (BaseMat)
 		{
-			LoadedMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+			if (UMaterialInstanceDynamic* NetMID = UMaterialInstanceDynamic::Create(BaseMat, HostActor))
+			{
+				const FLinearColor CyanNetColor(0.18f, 0.96f, 0.92f, 1.0f);
+				NetMID->SetVectorParameterValue(TEXT("MineralTipColor"), CyanNetColor);
+				NetMID->SetVectorParameterValue(TEXT("MineralEmissiveColor"), CyanNetColor);
+				NetMID->SetScalarParameterValue(TEXT("MineralGlowIntensity"), 3.2f);
+				CachedCastNetMaterial = NetMID;
+			}
+			else
+			{
+				CachedCastNetMaterial = BaseMat;
+			}
 		}
-		CachedCastNetMaterial = LoadedMat;
 	}
 
 	if (UMaterialInterface* Mat = CachedCastNetMaterial.Get())
@@ -1313,7 +1325,12 @@ UProceduralMeshComponent* UNetTendrilAbility::EnsureCastNetMeshComponent()
 		NewNetMesh->SetMaterial(0, Mat);
 	}
 
+	if (USceneComponent* RootComp = HostActor->GetRootComponent())
+	{
+		NewNetMesh->AttachToComponent(RootComp, FAttachmentTransformRules::KeepWorldTransform);
+	}
 	NewNetMesh->RegisterComponent();
+	NewNetMesh->SetWorldTransform(FTransform::Identity);
 	NewNetMesh->SetVisibility(false);
 	CastNetMesh = NewNetMesh;
 	return NewNetMesh;
@@ -1517,7 +1534,7 @@ void UNetTendrilAbility::UpdateCastNetMesh(const FVector& StartPos, float Curren
 
 UJetTendrilAbility::UJetTendrilAbility()
 {
-	CooldownSeconds = 6.0f;
+	CooldownSeconds = 1.0f;
 	ExtendSpeed = 9.0f;
 	RetractSpeed = 7.5f;
 }

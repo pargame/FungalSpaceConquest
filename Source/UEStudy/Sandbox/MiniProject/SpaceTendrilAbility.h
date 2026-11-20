@@ -432,17 +432,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "2.5", ClampMax = "20.0"))
 	float NetReachBodyRadiusMultiplier = 7.2f;
 
-	/** 곰팡이 현재 반지름 대비 투망 발사 직후(시작점) 펼쳐짐 반경 배율입니다(시작부터 넓게 진행). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.5", ClampMax = "6.0"))
-	float NetStartSpreadBodyRadiusMultiplier = 1.65f;
+	/** 곰팡이 현재 반지름 대비 투망 발사 시작점(원뿔 꼭짓점) 반경 배율입니다(작을수록 뾰족한 원뿔 형태). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.05", ClampMax = "4.0"))
+	float NetStartSpreadBodyRadiusMultiplier = 0.25f;
 
-	/** 곰팡이 현재 반지름 대비 투망 끝단 최대 펼쳐짐 반경 배율입니다(넓게 퍼지는 포획망). */
+	/** 곰팡이 현재 반지름 대비 투망 끝단 최대 펼쳐짐 반경 배율입니다(넓게 퍼지는 원뿔 포획망). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "2.0", ClampMax = "12.0"))
 	float NetMaxSpreadBodyRadiusMultiplier = 5.5f;
 
-	/** 투망 펼쳐짐 곡선 지수입니다(1.0 미만일수록 시작 구간부터 낙하산·투망처럼 확 넓게 펼쳐집니다). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.2", ClampMax = "1.5"))
-	float CastNetBellExponent = 0.50f;
+	/** 투망 원뿔 펼쳐짐 곡선 지수입니다(1.0 = 직선 원뿔, 0.9 = 자연스럽게 벌어지는 투망 원뿔, 낮을수록 둥근 종 모양). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.2", ClampMax = "1.8"))
+	float CastNetBellExponent = 0.92f;
 
 	/** 곰팡이 현재 반지름 대비 투망 그물 가닥의 굵기 비율입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.01", ClampMax = "0.2"))

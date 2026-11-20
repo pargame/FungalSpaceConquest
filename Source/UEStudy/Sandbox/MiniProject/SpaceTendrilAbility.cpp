@@ -1023,13 +1023,87 @@ void ULongTendrilAbility::DetachLatchedTarget()
 
 UNetTendrilAbility::UNetTendrilAbility()
 {
-	RetractSpeed = 2.6f;
+	RetractSpeed = 1.2f;
 	CooldownSeconds = 6.0f;
+}
+
+void UNetTendrilAbility::LatchCameraAimBasis()
+{
+	Super::LatchCameraAimBasis();
+
+	ISpaceTendrilHostInterface* HostIfc = Host.GetInterface();
+	if (!HostIfc)
+	{
+		return;
+	}
+
+	const FVector VisualOrigin = HostIfc->GetTendrilVisualOrigin();
+	FVector CamLoc = VisualOrigin;
+	FVector CamFwd = FVector::ForwardVector;
+	FVector CamRight = FVector::RightVector;
+	FVector CamUp = FVector::UpVector;
+	HostIfc->GetTendrilCameraBasis(CamLoc, CamFwd, CamRight, CamUp);
+	CamFwd = CamFwd.IsNearlyZero() ? FVector::ForwardVector : CamFwd.GetSafeNormal();
+
+	// 3인칭 카메라 소켓 오프셋으로 인한 시차(Parallax)를 제거하기 위해
+	// 화면 정중앙 크로스헤어 레이(TraceStart -> TraceEnd) 상의 목표점으로 수렴하도록 조준 축을 정렬합니다.
+	const float ReachDist = GetEffectiveReachCm();
+	const float PlayerProjDist = FMath::Max(FVector::DotProduct(VisualOrigin - CamLoc, CamFwd), 0.0f);
+	const FVector TraceStart = CamLoc + CamFwd * PlayerProjDist;
+	FVector ReticleAimPoint = TraceStart + CamFwd * ReachDist;
+
+	if (UWorld* World = HostIfc->GetTendrilWorld())
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(SpaceDrifterNetAim), false, HostIfc->GetTendrilHostActor());
+		const bool bHit = World->LineTraceSingleByChannel(Hit, TraceStart, ReticleAimPoint, ECC_Visibility, Params);
+		if (bHit && !Hit.bStartPenetrating)
+		{
+			const float MinConvergeDist = FMath::Min(ReachDist, 180.0f);
+			if (FVector::Distance(VisualOrigin, Hit.ImpactPoint) >= MinConvergeDist)
+			{
+				ReticleAimPoint = Hit.ImpactPoint;
+			}
+		}
+	}
+
+	const FVector ConvergedDir = (ReticleAimPoint - VisualOrigin).GetSafeNormal();
+	if (!ConvergedDir.IsNearlyZero())
+	{
+		LockedAimDir = ConvergedDir;
+		LastTendrilDir = ConvergedDir;
+
+		FVector OrthoRight = FVector::VectorPlaneProject(CamRight, LockedAimDir).GetSafeNormal();
+		if (OrthoRight.IsNearlyZero())
+		{
+			OrthoRight = FVector::CrossProduct(FVector::UpVector, LockedAimDir).GetSafeNormal();
+		}
+		if (OrthoRight.IsNearlyZero())
+		{
+			OrthoRight = FVector::CrossProduct(FVector::RightVector, LockedAimDir).GetSafeNormal();
+		}
+
+		FVector OrthoUp = FVector::CrossProduct(LockedAimDir, OrthoRight).GetSafeNormal();
+		if (OrthoUp.IsNearlyZero())
+		{
+			OrthoUp = FVector::VectorPlaneProject(CamUp, LockedAimDir).GetSafeNormal();
+		}
+
+		LockedAimRight = OrthoRight;
+		LockedAimUp = OrthoUp;
+		LockedAimTarget = VisualOrigin + LockedAimDir * ReachDist;
+	}
+}
+
+float UNetTendrilAbility::GetHoldDurationLimitSeconds() const
+{
+	const float ScaledHold = FMath::Max(HoldDurationSeconds, 0.0f) * FMath::Max(NetVisibilityHoldMultiplier, 0.5f);
+	return FMath::Max(ScaledHold, FMath::Max(MinHoldDurationSeconds, 0.0f));
 }
 
 void UNetTendrilAbility::OnAbilityActivated()
 {
-	RetractSpeed = FMath::Max(NetRetractSpeed, 0.5f);
+	RetractSpeed = FMath::Max(NetRetractSpeed * FMath::Clamp(NetRetractSpeedScale, 0.15f, 2.0f), 0.45f);
 	SlowedEnemiesThisShot.Reset();
 }
 
@@ -1137,8 +1211,9 @@ void UNetTendrilAbility::OnActiveTick(
 			}
 		}
 
-		const float VisualAlpha = FMath::SmoothStep(0.0f, 0.14f, ExtendAlpha);
-		const float LateBloom = FMath::SmoothStep(0.35f, 0.90f, EasedReach);
+		const float VisualAlpha = FMath::SmoothStep(0.0f, 0.08f, ExtendAlpha);
+		const float LateBloom = FMath::SmoothStep(0.15f, 0.70f, EasedReach);
+		const float EffectiveSpawnRate = FMath::Max(NetSporeSpawnRate, 10.0f) * VisualAlpha * (0.35f + 0.65f * LateBloom);
 
 		FX->SetVectorParameter(TEXT("User.TendrilStart"), StartPos);
 		FX->SetVectorParameter(TEXT("User.TendrilEnd"), EndPos);
@@ -1147,7 +1222,7 @@ void UNetTendrilAbility::OnActiveTick(
 		FX->SetVectorParameter(TEXT("User.AimUp"), LockedAimUp);
 		FX->SetFloatParameter(TEXT("User.TendrilAlpha"), VisualAlpha);
 		FX->SetFloatParameter(TEXT("User.TendrilReach"), EasedReach);
-		FX->SetFloatParameter(TEXT("User.SporeSpawnRate"), 44.0f * VisualAlpha * (0.15f + 0.85f * LateBloom));
+		FX->SetFloatParameter(TEXT("User.SporeSpawnRate"), EffectiveSpawnRate);
 
 		if (!FX->IsActive())
 		{

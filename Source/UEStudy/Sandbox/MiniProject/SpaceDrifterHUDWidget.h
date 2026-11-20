@@ -10,6 +10,7 @@ class ASpaceDrifterPlayerController;
 class AEnemyMoldManager;
 class SBorder;
 class SBox;
+class SDPIScaler;
 class SEditableTextBox;
 class SProgressBar;
 class STextBlock;
@@ -42,6 +43,12 @@ public:
 	/** V2/V3 신규 촉수 해금 시 중앙 대형 팝업·4면 테두리 플래시·하단 슬롯 해금 글로우 연출을 발동합니다. */
 	void TriggerAbilityUnlockEffect(ETendrilVisualStyle UnlockedStyle);
 
+	/** 잠긴 촉수 능력을 선택/사용하려 할 때 화면 중앙 상단에 강렬한 경고 배너 애니메이션을 발동합니다. */
+	void TriggerLockedAbilityWarning(ETendrilVisualStyle LockedStyle, int32 RequiredDefeats, int32 CurrentDefeats);
+
+	/** 일시정지 메뉴의 UI 크기·텍스처 품질·전체 그래픽 품질 선택 상태를 최신 설정값으로 갱신합니다. */
+	void RefreshPauseMenuSettingsDisplay();
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
@@ -51,17 +58,27 @@ private:
 	EVisibility GetTitleOverlayVisibility() const;
 	EVisibility GetInGameHUDVisibility() const;
 	EVisibility GetGameOverOverlayVisibility() const;
+	EVisibility GetPauseMenuOverlayVisibility() const;
 	EVisibility GetBannerVisibility() const;
 	EVisibility GetReticleTargetVisibility() const;
+	float GetCurrentUIScale() const { return CurrentUIScale; }
 
 	void OnNameTextChanged(const FText& NewText);
 	void OnNameTextCommitted(const FText& NewText, ETextCommit::Type CommitType);
 	FReply OnResetLeaderboardClicked();
+	FReply OnUIScaleSelected(int32 PresetIndex);
+	FReply OnTextureQualitySelected(int32 QualityLevel);
+	FReply OnGraphicsQualitySelected(int32 QualityLevel);
+	FReply OnTitleOptionsClicked();
+	FReply OnPauseResumeClicked();
+	FReply OnPauseRestartClicked();
+	FReply OnPauseQuitClicked();
 	void PopulateLeaderboardBox(const TSharedPtr<SVerticalBox>& TargetBox);
 
 	void RefreshTitlePulse(float InDeltaTime);
 	void RefreshDamageEdgeFlash(float InDeltaTime);
 	void RefreshUnlockEffects(float InDeltaTime);
+	void RefreshLockedAbilityWarning(float InDeltaTime);
 	void RefreshHUDTexts();
 	void RefreshAimReticle();
 	void RefreshEnemyIndicator(const FGeometry& MyGeometry);
@@ -141,6 +158,27 @@ private:
 	TSharedPtr<STextBlock> SlotTitleTexts[3];
 	TSharedPtr<STextBlock> SlotDescTexts[3];
 
+	// 루트 UI 스케일러 (일시정지 메뉴 UI 크기 조절용)
+	TSharedPtr<SDPIScaler> RootDPIScaler;
+
+	// 잠긴 촉수 능력 선택 시 대형 중앙 경고 배너
+	TSharedPtr<SBorder> LockedWarningOuterBorder;
+	TSharedPtr<SBorder> LockedWarningInnerBorder;
+	TSharedPtr<STextBlock> LockedWarningBadgeTextBlock;
+	TSharedPtr<STextBlock> LockedWarningTitleTextBlock;
+	TSharedPtr<STextBlock> LockedWarningDetailTextBlock;
+
+	// ESC 일시정지 메뉴 설정 버튼 참조
+	static constexpr int32 NumUIScalePresets = 5;
+	static constexpr int32 NumQualityLevels = 4;
+	TSharedPtr<SBorder> PauseUIScaleBtnBorders[NumUIScalePresets];
+	TSharedPtr<STextBlock> PauseUIScaleBtnTexts[NumUIScalePresets];
+	TSharedPtr<SBorder> PauseTexQualityBtnBorders[NumQualityLevels];
+	TSharedPtr<STextBlock> PauseTexQualityBtnTexts[NumQualityLevels];
+	TSharedPtr<SBorder> PauseGfxQualityBtnBorders[NumQualityLevels];
+	TSharedPtr<STextBlock> PauseGfxQualityBtnTexts[NumQualityLevels];
+	TSharedPtr<STextBlock> PauseCurrentSettingsSummaryTextBlock;
+
 	// 종료(5분 완주 / 게임오버) 오버레이
 	TSharedPtr<STextBlock> EndTitleTextBlock;
 	TSharedPtr<STextBlock> EndSubTitleTextBlock;
@@ -158,6 +196,10 @@ private:
 	float UnlockPopupTotalSeconds = 3.2f;
 	FLinearColor UnlockPopupAccentColor = FLinearColor(0.20f, 0.94f, 1.0f, 1.0f);
 	float SlotUnlockGlowTimers[3] = { 0.0f, 0.0f, 0.0f };
+	float SlotLockedFlashTimers[3] = { 0.0f, 0.0f, 0.0f };
+	float LockedWarningRemainingSeconds = 0.0f;
+	float LockedWarningTotalSeconds = 2.1f;
+	float CurrentUIScale = 1.0f;
 	bool bPendingInitialNameFocus = true;
 	bool bReticleTargetInRange = false;
 };

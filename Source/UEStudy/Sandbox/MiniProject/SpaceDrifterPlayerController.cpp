@@ -6,6 +6,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "SpaceDrifterHUDWidget.h"
 #include "SpaceDrifterLeaderboardSave.h"
 #include "SpaceDrifterPawn.h"
@@ -66,6 +67,10 @@ void ASpaceDrifterPlayerController::SetupInputComponent()
 
 		FInputKeyBinding& SpaceReleaseBinding = InputComponent->BindKey(EKeys::SpaceBar, IE_Released, this, &ASpaceDrifterPlayerController::OnTitleConfirmKeyReleased);
 		SpaceReleaseBinding.bConsumeInput = false;
+
+		FInputKeyBinding& EscapeBinding = InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ASpaceDrifterPlayerController::OnPauseMenuKeyPressed);
+		EscapeBinding.bExecuteWhenPaused = true;
+		EscapeBinding.bConsumeInput = true;
 	}
 
 	if (IsLocalPlayerController())
@@ -85,7 +90,10 @@ void ASpaceDrifterPlayerController::SetupInputComponent()
 
 void ASpaceDrifterPlayerController::SetCurrentPlayerName(const FString& InName, bool bSaveToDisk)
 {
-	CurrentPlayerName = InName.TrimStartAndEnd().Left(12);
+	FString Sanitized = InName;
+	Sanitized.ReplaceInline(TEXT(" "), TEXT(""));
+	Sanitized.ReplaceInline(TEXT("\t"), TEXT(""));
+	CurrentPlayerName = Sanitized.TrimStartAndEnd().Left(12);
 	if (bSaveToDisk)
 	{
 		if (USpaceDrifterLeaderboardSave* SaveObj = USpaceDrifterLeaderboardSave::LoadOrCreate())
@@ -103,6 +111,12 @@ FString ASpaceDrifterPlayerController::GetCurrentPlayerName() const
 
 void ASpaceDrifterPlayerController::NotifyRunEnded()
 {
+	if (bIsPauseMenuOpen)
+	{
+		bIsPauseMenuOpen = false;
+		SetPause(false);
+	}
+
 	if (const UWorld* World = GetWorld())
 	{
 		RunEndedWorldTime = World->GetTimeSeconds();
@@ -123,10 +137,96 @@ void ASpaceDrifterPlayerController::NotifyRunEnded()
 	}
 }
 
+void ASpaceDrifterPlayerController::TogglePauseMenu()
+{
+	SetPauseMenuOpen(!bIsPauseMenuOpen);
+}
+
+void ASpaceDrifterPlayerController::SetPauseMenuOpen(bool bOpen)
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (bOpen)
+	{
+		if (const ASpaceDrifterPawn* DrifterPawn = Cast<ASpaceDrifterPawn>(GetPawn()))
+		{
+			if (DrifterPawn->IsRunEnded())
+			{
+				return;
+			}
+		}
+	}
+
+	bIsPauseMenuOpen = bOpen;
+
+	// 타이틀 화면에서는 라이브 3D 배경을 유지하고, 인게임 플레이 중일 때만 월드 일시정지
+	if (!bIsInTitleScreen)
+	{
+		SetPause(bOpen);
+	}
+
+	if (bOpen)
+	{
+		SetShowMouseCursor(true);
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+
+		if (HUDWidgetInstance)
+		{
+			HUDWidgetInstance->RefreshPauseMenuSettingsDisplay();
+		}
+	}
+	else
+	{
+		if (bIsInTitleScreen)
+		{
+			SetShowMouseCursor(true);
+			FInputModeGameAndUI InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			InputMode.SetHideCursorDuringCapture(false);
+			SetInputMode(InputMode);
+		}
+		else
+		{
+			if (FSlateApplication::IsInitialized())
+			{
+				FSlateApplication::Get().SetUserFocusToGameViewport(0);
+			}
+			SetShowMouseCursor(false);
+			SetInputMode(FInputModeGameOnly());
+		}
+	}
+}
+
+void ASpaceDrifterPlayerController::RestartFromPauseMenu()
+{
+	bIsPauseMenuOpen = false;
+	SetPause(false);
+
+	if (ASpaceDrifterPawn* DrifterPawn = Cast<ASpaceDrifterPawn>(GetPawn()))
+	{
+		DrifterPawn->RestartCurrentLevel();
+	}
+}
+
+void ASpaceDrifterPlayerController::QuitGameFromPauseMenu()
+{
+	bIsPauseMenuOpen = false;
+	SetPause(false);
+	UKismetSystemLibrary::QuitGame(this, this, EQuitPreference::Quit, false);
+}
+
 void ASpaceDrifterPlayerController::StartGameplayFromTitle()
 {
 	bIsInTitleScreen = false;
 	bIsNameInputFocused = false;
+	bIsPauseMenuOpen = false;
+	bSuppressTendrilUntilSpaceRelease = true;
 
 	if (IsLocalPlayerController())
 	{
@@ -150,13 +250,14 @@ void ASpaceDrifterPlayerController::StartGameplayFromTitle()
 
 void ASpaceDrifterPlayerController::OnTitleConfirmKeyPressed()
 {
+	if (bIsPauseMenuOpen)
+	{
+		return;
+	}
+
 	if (bIsInTitleScreen)
 	{
-		if (bIsNameInputFocused)
-		{
-			return;
-		}
-		bSuppressTendrilUntilSpaceRelease = true;
+		SetCurrentPlayerName(CurrentPlayerName, true);
 		StartGameplayFromTitle();
 		return;
 	}
@@ -179,6 +280,22 @@ void ASpaceDrifterPlayerController::OnTitleConfirmKeyPressed()
 void ASpaceDrifterPlayerController::OnTitleConfirmKeyReleased()
 {
 	bSuppressTendrilUntilSpaceRelease = false;
+}
+
+void ASpaceDrifterPlayerController::OnPauseMenuKeyPressed()
+{
+	if (bIsInTitleScreen)
+	{
+		return;
+	}
+	if (const ASpaceDrifterPawn* DrifterPawn = Cast<ASpaceDrifterPawn>(GetPawn()))
+	{
+		if (DrifterPawn->IsRunEnded())
+		{
+			return;
+		}
+	}
+	TogglePauseMenu();
 }
 
 void ASpaceDrifterPlayerController::EnsureHUDCreated()

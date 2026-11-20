@@ -1,8 +1,11 @@
 #include "SpaceDrifterHUDWidget.h"
 
 #include "EnemyMoldManager.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Text/TextLayout.h"
+#include "GameFramework/GameUserSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "SpaceDrifterLeaderboardSave.h"
 #include "SpaceDrifterPawn.h"
@@ -14,6 +17,7 @@
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SDPIScaler.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Notifications/SProgressBar.h"
 #include "Widgets/SBoxPanel.h"
@@ -33,6 +37,7 @@ void USpaceDrifterHUDWidget::BindToPawnAndController(ASpaceDrifterPawn* InPawn, 
 		}
 	}
 	RefreshLeaderboardDisplay();
+	RefreshPauseMenuSettingsDisplay();
 	RefreshHUDTexts();
 	RefreshAimReticle();
 }
@@ -87,15 +92,20 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 			.VAlign(VAlign_Center)
 			.Padding(0.0f, 0.0f, 12.0f, 0.0f)
 			[
-				SNew(SBorder)
-				.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-				.BorderBackgroundColor(FLinearColor(0.10f, 0.24f, 0.26f, 0.90f))
-				.Padding(FMargin(8.0f, 3.0f))
+				SNew(SBox)
+				.MinDesiredWidth(92.0f)
 				[
-					SNew(STextBlock)
-					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
-					.ColorAndOpacity(FSlateColor(FLinearColor(0.42f, 0.96f, 0.80f, 1.0f)))
-					.Text(FText::FromString(KeyTag))
+					SNew(SBorder)
+					.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+					.BorderBackgroundColor(FLinearColor(0.10f, 0.24f, 0.26f, 0.92f))
+					.HAlign(HAlign_Center)
+					.Padding(FMargin(8.0f, 3.0f))
+					[
+						SNew(STextBlock)
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+						.ColorAndOpacity(FSlateColor(FLinearColor(0.42f, 0.96f, 0.80f, 1.0f)))
+						.Text(FText::FromString(KeyTag))
+					]
 				]
 			]
 			+ SHorizontalBox::Slot()
@@ -109,7 +119,115 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 			];
 	};
 
-	return SNew(SOverlay)
+	auto BuildPauseUIScaleRow = [this, WhiteBrush, &HUDLabelFont]() -> TSharedRef<SWidget>
+	{
+		static const TCHAR* ScaleLabels[NumUIScalePresets] = {
+			TEXT("75%"), TEXT("90%"), TEXT("100%"), TEXT("115%"), TEXT("130%")
+		};
+		TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+		for (int32 i = 0; i < NumUIScalePresets; ++i)
+		{
+			Row->AddSlot()
+				.FillWidth(1.0f)
+				.Padding(i == 0 ? 0.0f : 4.0f, 0.0f, i == NumUIScalePresets - 1 ? 0.0f : 4.0f, 0.0f)
+				[
+					SNew(SButton)
+					.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+					.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnUIScaleSelected, i))
+					.ContentPadding(FMargin(0.0f))
+					[
+						SAssignNew(PauseUIScaleBtnBorders[i], SBorder)
+						.BorderImage(WhiteBrush)
+						.BorderBackgroundColor(FLinearColor(0.09f, 0.13f, 0.20f, 0.95f))
+						.HAlign(HAlign_Center)
+						.VAlign(VAlign_Center)
+						.Padding(FMargin(6.0f, 8.0f))
+						[
+							SAssignNew(PauseUIScaleBtnTexts[i], STextBlock)
+							.Font(HUDLabelFont)
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.82f, 0.90f, 0.96f, 1.0f)))
+							.Text(FText::FromString(ScaleLabels[i]))
+						]
+					]
+				];
+		}
+		return Row;
+	};
+
+	auto BuildPauseTexQualityRow = [this, WhiteBrush, &HUDLabelFont]() -> TSharedRef<SWidget>
+	{
+		static const TCHAR* QualityLabels[NumQualityLevels] = {
+			TEXT("낮음"), TEXT("보통"), TEXT("높음"), TEXT("에픽")
+		};
+		TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+		for (int32 i = 0; i < NumQualityLevels; ++i)
+		{
+			Row->AddSlot()
+				.FillWidth(1.0f)
+				.Padding(i == 0 ? 0.0f : 4.0f, 0.0f, i == NumQualityLevels - 1 ? 0.0f : 4.0f, 0.0f)
+				[
+					SNew(SButton)
+					.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+					.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnTextureQualitySelected, i))
+					.ContentPadding(FMargin(0.0f))
+					[
+						SAssignNew(PauseTexQualityBtnBorders[i], SBorder)
+						.BorderImage(WhiteBrush)
+						.BorderBackgroundColor(FLinearColor(0.09f, 0.13f, 0.20f, 0.95f))
+						.HAlign(HAlign_Center)
+						.VAlign(VAlign_Center)
+						.Padding(FMargin(8.0f, 8.0f))
+						[
+							SAssignNew(PauseTexQualityBtnTexts[i], STextBlock)
+							.Font(HUDLabelFont)
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.82f, 0.90f, 0.96f, 1.0f)))
+							.Text(FText::FromString(QualityLabels[i]))
+						]
+					]
+				];
+		}
+		return Row;
+	};
+
+	auto BuildPauseGfxQualityRow = [this, WhiteBrush, &HUDLabelFont]() -> TSharedRef<SWidget>
+	{
+		static const TCHAR* QualityLabels[NumQualityLevels] = {
+			TEXT("낮음"), TEXT("보통"), TEXT("높음"), TEXT("에픽")
+		};
+		TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+		for (int32 i = 0; i < NumQualityLevels; ++i)
+		{
+			Row->AddSlot()
+				.FillWidth(1.0f)
+				.Padding(i == 0 ? 0.0f : 4.0f, 0.0f, i == NumQualityLevels - 1 ? 0.0f : 4.0f, 0.0f)
+				[
+					SNew(SButton)
+					.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+					.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnGraphicsQualitySelected, i))
+					.ContentPadding(FMargin(0.0f))
+					[
+						SAssignNew(PauseGfxQualityBtnBorders[i], SBorder)
+						.BorderImage(WhiteBrush)
+						.BorderBackgroundColor(FLinearColor(0.09f, 0.13f, 0.20f, 0.95f))
+						.HAlign(HAlign_Center)
+						.VAlign(VAlign_Center)
+						.Padding(FMargin(8.0f, 8.0f))
+						[
+							SAssignNew(PauseGfxQualityBtnTexts[i], STextBlock)
+							.Font(HUDLabelFont)
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.82f, 0.90f, 0.96f, 1.0f)))
+							.Text(FText::FromString(QualityLabels[i]))
+						]
+					]
+				];
+		}
+		return Row;
+	};
+
+	return SAssignNew(RootDPIScaler, SDPIScaler)
+		.DPIScale(TAttribute<float>::Create(TAttribute<float>::FGetter::CreateUObject(this, &USpaceDrifterHUDWidget::GetCurrentUIScale)))
+		[
+			SNew(SOverlay)
 
 		// =========================================================================
 		// 레이어 1: 타이틀 시작 화면 (라이브 3D 우주 배경 위 반투명 글래스 카드)
@@ -207,33 +325,54 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 									SNew(STextBlock)
 									.Font(SectionTitleFont)
 									.ColorAndOpacity(FSlateColor(FLinearColor(0.86f, 0.94f, 1.0f, 1.0f)))
-									.Text(FText::FromString(TEXT("촉수 능력 및 규칙")))
+									.Text(FText::FromString(TEXT("조작법 및 촉수 능력 안내")))
 								]
 
 								+ SVerticalBox::Slot()
 								.AutoHeight()
 								.Padding(0.0f, 3.0f)
 								[
-									MakeGuideLine(TEXT("[1] V1 긴 촉수"), TEXT("소행성·적 곰팡이 그래플 & 전염 → 배양 폭발"))
+									MakeGuideLine(TEXT("마우스 이동"), TEXT("카메라 회전 및 360° 무중력 조준"))
 								]
 
 								+ SVerticalBox::Slot()
 								.AutoHeight()
 								.Padding(0.0f, 3.0f)
 								[
-									MakeGuideLine(TEXT("[2] V2 그물 촉수"), TEXT("미네랄 대량 포획 · 포식자 2.5초 둔화 (쿨 6초)"))
+									MakeGuideLine(TEXT("스페이스바"), TEXT("선택한 촉수 발사 (길게 누르면 당기기·전염 유지)"))
 								]
 
 								+ SVerticalBox::Slot()
 								.AutoHeight()
 								.Padding(0.0f, 3.0f)
 								[
-									MakeGuideLine(TEXT("[3] V3 긴급 탈출"), TEXT("단발 초고속 분사 탈출 · 가용 8% 소모 (쿨 6초)"))
+									MakeGuideLine(TEXT("1번 키"), TEXT("V1 긴 촉수 — 소행성·적 곰팡이 그래플 & 전염 → 배양 폭발"))
+								]
+
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 3.0f)
+								[
+									MakeGuideLine(TEXT("2번 키"), TEXT("V2 그물 촉수 — 미네랄 대량 포획 · 포식자 둔화 & 축소 (2처치 해금)"))
+								]
+
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 3.0f)
+								[
+									MakeGuideLine(TEXT("3번 키"), TEXT("V3 긴급 탈출 — 단발 초고속 분사 탈출 · 가용 8% 소모 (5처치 해금)"))
+								]
+
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 3.0f)
+								[
+									MakeGuideLine(TEXT("ESC 키"), TEXT("일시정지 및 설정 (UI 크기 · 그래픽 품질 · 재시작/종료)"))
 								]
 							]
 						]
 
-						// 플레이어 이름 입력창 (Enter 확정 후 SPACE 시작)
+						// 플레이어 이름 입력창 (공백 불가 · 스페이스바 즉시 시작)
 						+ SVerticalBox::Slot()
 						.AutoHeight()
 						.Padding(0.0f, 0.0f, 0.0f, 16.0f)
@@ -261,7 +400,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 										SAssignNew(NameConfirmHintTextBlock, STextBlock)
 										.Font(MicroHeaderFont)
 										.ColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.85f, 0.95f, 0.85f)))
-										.Text(FText::FromString(TEXT("입력 후 ENTER 확정 → SPACE 시작")))
+										.Text(FText::FromString(TEXT("이름 입력 후 스페이스바 즉시 시작 (공백 불가)")))
 									]
 								]
 								+ SVerticalBox::Slot()
@@ -269,6 +408,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 								[
 									SAssignNew(NameInputTextBox, SEditableTextBox)
 									.Font(HUDStatFont)
+									.Justification(ETextJustify::Center)
 									.HintText(FText::FromString(TEXT("이름 입력 (비워두면 '익명 곰팡이')")))
 									.OnTextChanged(FOnTextChanged::CreateUObject(this, &USpaceDrifterHUDWidget::OnNameTextChanged))
 									.OnTextCommitted(FOnTextCommitted::CreateUObject(this, &USpaceDrifterHUDWidget::OnNameTextCommitted))
@@ -325,6 +465,58 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 								.Font(TitlePromptSubFont)
 								.ColorAndOpacity(FSlateColor(FLinearColor(0.56f, 0.82f, 0.78f, 0.88f)))
 								.Text(FText::FromString(TEXT("스페이스바 한 방이면 온 우주가 내 포자밭")))
+							]
+						]
+
+						// 타이틀 하단 클릭 버튼 (옵션 / 게임 종료)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 16.0f, 0.0f, 0.0f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(0.0f, 0.0f, 6.0f, 0.0f)
+							[
+								SNew(SButton)
+								.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+								.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnTitleOptionsClicked))
+								.ContentPadding(FMargin(0.0f))
+								[
+									SNew(SBorder)
+									.BorderImage(WhiteBrush)
+									.BorderBackgroundColor(FLinearColor(0.11f, 0.22f, 0.34f, 0.94f))
+									.HAlign(HAlign_Center)
+									.Padding(FMargin(14.0f, 10.0f))
+									[
+										SNew(STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.84f, 0.94f, 1.0f, 1.0f)))
+										.Text(FText::FromString(TEXT("옵션 (설정)")))
+									]
+								]
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(6.0f, 0.0f, 0.0f, 0.0f)
+							[
+								SNew(SButton)
+								.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+								.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnPauseQuitClicked))
+								.ContentPadding(FMargin(0.0f))
+								[
+									SNew(SBorder)
+									.BorderImage(WhiteBrush)
+									.BorderBackgroundColor(FLinearColor(0.36f, 0.10f, 0.14f, 0.94f))
+									.HAlign(HAlign_Center)
+									.Padding(FMargin(14.0f, 10.0f))
+									[
+										SNew(STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.78f, 0.80f, 1.0f)))
+										.Text(FText::FromString(TEXT("게임 종료")))
+									]
+								]
 							]
 						]
 					]
@@ -1071,7 +1263,57 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 							SAssignNew(UnlockPopupDescTextBlock, STextBlock)
 							.Font(FCoreStyle::GetDefaultFontStyle("Regular", 12))
 							.ColorAndOpacity(FSlateColor(FLinearColor(0.76f, 0.92f, 0.98f, 0.95f)))
-							.Text(FText::FromString(TEXT("광역 포식자 둔화 · 크기 -15% 영구 축소  |  [2] 키로 전환")))
+							.Text(FText::FromString(TEXT("광역 포식자 둔화 · 크기 -15% 영구 축소  |  2번 키로 전환")))
+						]
+					]
+				]
+			]
+
+			// [구역 I: 화면 중앙 상단] 잠긴 촉수 능력 경고 배너 (강렬한 붉은/앰버 발광 프레임 + 스케일 팝 + 셰이크)
+			+ SOverlay::Slot()
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			.Padding(0.0f, 0.0f, 0.0f, 150.0f)
+			[
+				SAssignNew(LockedWarningOuterBorder, SBorder)
+				.Visibility(EVisibility::Collapsed)
+				.BorderImage(WhiteBrush)
+				.BorderBackgroundColor(FLinearColor(1.0f, 0.24f, 0.16f, 0.98f))
+				.Padding(FMargin(3.5f))
+				[
+					SAssignNew(LockedWarningInnerBorder, SBorder)
+					.BorderImage(WhiteBrush)
+					.BorderBackgroundColor(FLinearColor(0.14f, 0.02f, 0.04f, 0.96f))
+					.Padding(FMargin(36.0f, 18.0f))
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Center)
+						[
+							SAssignNew(LockedWarningBadgeTextBlock, STextBlock)
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+							.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.72f, 0.22f, 1.0f)))
+							.Text(FText::FromString(TEXT("⚠  LOCKED ABILITY  ⚠")))
+						]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Center)
+						.Padding(0.0f, 6.0f, 0.0f, 4.0f)
+						[
+							SAssignNew(LockedWarningTitleTextBlock, STextBlock)
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 22))
+							.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.94f, 0.92f, 1.0f)))
+							.Text(FText::FromString(TEXT("🔒 아직 잠긴 능력입니다!")))
+						]
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Center)
+						[
+							SAssignNew(LockedWarningDetailTextBlock, STextBlock)
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 13))
+							.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.78f, 0.36f, 1.0f)))
+							.Text(FText::FromString(TEXT("포식자 2마리 처치 시 해금 (현재 0 / 2)")))
 						]
 					]
 				]
@@ -1221,7 +1463,230 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 					]
 				]
 			]
-		];
+		]
+
+		// =========================================================================
+		// 레이어 4: ESC 일시정지 & 환경 설정 오버레이
+		// =========================================================================
+		+ SOverlay::Slot()
+		.HAlign(HAlign_Fill)
+		.VAlign(VAlign_Fill)
+		[
+			SNew(SBorder)
+			.Visibility(TAttribute<EVisibility>::Create(TAttribute<EVisibility>::FGetter::CreateUObject(this, &USpaceDrifterHUDWidget::GetPauseMenuOverlayVisibility)))
+			.BorderImage(WhiteBrush)
+			.BorderBackgroundColor(FLinearColor(0.01f, 0.02f, 0.05f, 0.72f))
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			[
+				SNew(SBox)
+				.WidthOverride(540.0f)
+				[
+					SNew(SBorder)
+					.BorderImage(WhiteBrush)
+					.BorderBackgroundColor(FLinearColor(0.03f, 0.05f, 0.10f, 0.96f))
+					.Padding(FMargin(32.0f, 26.0f))
+					[
+						SNew(SVerticalBox)
+
+						// 상단 액센트 라인
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 0.0f, 0.0f, 16.0f)
+						[
+							SNew(SBox).HeightOverride(3.0f)
+							[
+								SNew(SBorder)
+								.BorderImage(WhiteBrush)
+								.BorderBackgroundColor(FLinearColor(0.24f, 0.94f, 0.74f, 0.95f))
+							]
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Center)
+						[
+							SNew(STextBlock)
+							.Font(HeroTagFont)
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.36f, 0.94f, 0.78f, 1.0f)))
+							.Text(FText::FromString(TEXT("PAUSED  ·  SYSTEM SETTINGS")))
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Center)
+						.Padding(0.0f, 4.0f, 0.0f, 4.0f)
+						[
+							SNew(STextBlock)
+							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 26))
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.96f, 0.99f, 1.0f, 1.0f)))
+							.Text(FText::FromString(TEXT("일시정지 및 설정")))
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.HAlign(HAlign_Center)
+						.Padding(0.0f, 0.0f, 0.0f, 18.0f)
+						[
+							SNew(STextBlock)
+							.Font(HUDLabelFont)
+							.ColorAndOpacity(FSlateColor(FLinearColor(0.62f, 0.74f, 0.88f, 0.90f)))
+							.Text(FText::FromString(TEXT("ESC 키를 다시 누르면 즉시 게임으로 복귀합니다")))
+						]
+
+						// 설정 카드
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 0.0f, 0.0f, 18.0f)
+						[
+							SNew(SBorder)
+							.BorderImage(WhiteBrush)
+							.BorderBackgroundColor(FLinearColor(0.06f, 0.09f, 0.15f, 0.92f))
+							.Padding(FMargin(18.0f, 16.0f))
+							[
+								SNew(SVerticalBox)
+
+								// 1) UI 크기 (UI Scale)
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 0.0f, 0.0f, 6.0f)
+								[
+									SNew(STextBlock)
+									.Font(SectionTitleFont)
+									.ColorAndOpacity(FSlateColor(FLinearColor(0.86f, 0.94f, 1.0f, 1.0f)))
+									.Text(FText::FromString(TEXT("UI 크기 (UI Scale)")))
+								]
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 0.0f, 0.0f, 14.0f)
+								[
+									BuildPauseUIScaleRow()
+								]
+
+								// 2) 텍스처 품질 (Texture Quality)
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 0.0f, 0.0f, 6.0f)
+								[
+									SNew(STextBlock)
+									.Font(SectionTitleFont)
+									.ColorAndOpacity(FSlateColor(FLinearColor(0.86f, 0.94f, 1.0f, 1.0f)))
+									.Text(FText::FromString(TEXT("텍스처 품질 (Texture Quality)")))
+								]
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 0.0f, 0.0f, 14.0f)
+								[
+									BuildPauseTexQualityRow()
+								]
+
+								// 3) 전체 그래픽 품질 (Graphics Quality)
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 0.0f, 0.0f, 6.0f)
+								[
+									SNew(STextBlock)
+									.Font(SectionTitleFont)
+									.ColorAndOpacity(FSlateColor(FLinearColor(0.86f, 0.94f, 1.0f, 1.0f)))
+									.Text(FText::FromString(TEXT("전체 그래픽 품질 (Graphics Quality)")))
+								]
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.Padding(0.0f, 0.0f, 0.0f, 10.0f)
+								[
+									BuildPauseGfxQualityRow()
+								]
+
+								+ SVerticalBox::Slot()
+								.AutoHeight()
+								.HAlign(HAlign_Center)
+								[
+									SAssignNew(PauseCurrentSettingsSummaryTextBlock, STextBlock)
+									.Font(MicroHeaderFont)
+									.ColorAndOpacity(FSlateColor(FLinearColor(0.56f, 0.78f, 0.86f, 0.92f)))
+									.Text(FText::FromString(TEXT("현재 적용: UI 100% · 텍스처 높음 · 전체 높음")))
+								]
+							]
+						]
+
+						// 하단 액션 버튼 (계속하기 / 다시 시작 / 게임 나가기)
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.0f, 0.0f, 0.0f, 8.0f)
+						[
+							SNew(SButton)
+							.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+							.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnPauseResumeClicked))
+							.ContentPadding(FMargin(0.0f))
+							[
+								SNew(SBorder)
+								.BorderImage(WhiteBrush)
+								.BorderBackgroundColor(FLinearColor(0.10f, 0.38f, 0.34f, 0.96f))
+								.HAlign(HAlign_Center)
+								.Padding(FMargin(16.0f, 12.0f))
+								[
+									SNew(STextBlock)
+									.Font(HUDStatFont)
+									.ColorAndOpacity(FSlateColor(FLinearColor(0.88f, 1.0f, 0.96f, 1.0f)))
+									.Text(FText::FromString(TEXT("계속하기  (ESC)")))
+								]
+							]
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(0.0f, 0.0f, 6.0f, 0.0f)
+							[
+								SNew(SButton)
+								.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+								.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnPauseRestartClicked))
+								.ContentPadding(FMargin(0.0f))
+								[
+									SNew(SBorder)
+									.BorderImage(WhiteBrush)
+									.BorderBackgroundColor(FLinearColor(0.14f, 0.20f, 0.30f, 0.95f))
+									.HAlign(HAlign_Center)
+									.Padding(FMargin(14.0f, 11.0f))
+									[
+										SNew(STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(0.88f, 0.94f, 1.0f, 1.0f)))
+										.Text(FText::FromString(TEXT("다시 시작")))
+									]
+								]
+							]
+							+ SHorizontalBox::Slot()
+							.FillWidth(1.0f)
+							.Padding(6.0f, 0.0f, 0.0f, 0.0f)
+							[
+								SNew(SButton)
+								.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
+								.OnClicked(FOnClicked::CreateUObject(this, &USpaceDrifterHUDWidget::OnPauseQuitClicked))
+								.ContentPadding(FMargin(0.0f))
+								[
+									SNew(SBorder)
+									.BorderImage(WhiteBrush)
+									.BorderBackgroundColor(FLinearColor(0.36f, 0.10f, 0.14f, 0.95f))
+									.HAlign(HAlign_Center)
+									.Padding(FMargin(14.0f, 11.0f))
+									[
+										SNew(STextBlock)
+										.Font(HUDStatFont)
+										.ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.78f, 0.80f, 1.0f)))
+										.Text(FText::FromString(TEXT("게임 나가기")))
+									]
+								]
+							]
+						]
+					]
+				]
+			]
+		]
+	];
 }
 
 TSharedRef<SWidget> USpaceDrifterHUDWidget::BuildTendrilSlotBox(
@@ -1297,6 +1762,8 @@ void USpaceDrifterHUDWidget::ReleaseSlateResources(bool bReleaseChildren)
 {
 	Super::ReleaseSlateResources(bReleaseChildren);
 
+	RootDPIScaler.Reset();
+
 	NameInputTextBox.Reset();
 	NameConfirmHintTextBlock.Reset();
 	TitleLeaderboardListBox.Reset();
@@ -1330,6 +1797,24 @@ void USpaceDrifterHUDWidget::ReleaseSlateResources(bool bReleaseChildren)
 	UnlockPopupTagTextBlock.Reset();
 	UnlockPopupTitleTextBlock.Reset();
 	UnlockPopupDescTextBlock.Reset();
+	LockedWarningOuterBorder.Reset();
+	LockedWarningInnerBorder.Reset();
+	LockedWarningBadgeTextBlock.Reset();
+	LockedWarningTitleTextBlock.Reset();
+	LockedWarningDetailTextBlock.Reset();
+	PauseCurrentSettingsSummaryTextBlock.Reset();
+	for (int32 i = 0; i < NumUIScalePresets; ++i)
+	{
+		PauseUIScaleBtnBorders[i].Reset();
+		PauseUIScaleBtnTexts[i].Reset();
+	}
+	for (int32 i = 0; i < NumQualityLevels; ++i)
+	{
+		PauseTexQualityBtnBorders[i].Reset();
+		PauseTexQualityBtnTexts[i].Reset();
+		PauseGfxQualityBtnBorders[i].Reset();
+		PauseGfxQualityBtnTexts[i].Reset();
+	}
 	ReticleDotBox.Reset();
 	ReticleDotBorder.Reset();
 	ReticleRangeTextBlock.Reset();
@@ -1380,6 +1865,7 @@ void USpaceDrifterHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	}
 	RefreshTitlePulse(InDeltaTime);
 	RefreshUnlockEffects(InDeltaTime);
+	RefreshLockedAbilityWarning(InDeltaTime);
 	RefreshDamageEdgeFlash(InDeltaTime);
 	RefreshHUDTexts();
 	RefreshAimReticle();
@@ -1475,6 +1961,112 @@ void USpaceDrifterHUDWidget::RefreshUnlockEffects(float InDeltaTime)
 			UnlockPopupAccentColor.G,
 			UnlockPopupAccentColor.B,
 			Alpha)));
+	}
+}
+
+void USpaceDrifterHUDWidget::TriggerLockedAbilityWarning(ETendrilVisualStyle LockedStyle, int32 RequiredDefeats, int32 CurrentDefeats)
+{
+	const bool bIsV3 = (LockedStyle == ETendrilVisualStyle::SporeJet);
+	const int32 SlotIndex = bIsV3 ? 2 : 1;
+	const int32 ClampedRequired = FMath::Max(RequiredDefeats, 0);
+	const int32 ClampedCurrent = FMath::Max(CurrentDefeats, 0);
+	const int32 RemainingDefeats = FMath::Max(ClampedRequired - ClampedCurrent, 0);
+
+	LockedWarningTotalSeconds = 2.1f;
+	LockedWarningRemainingSeconds = LockedWarningTotalSeconds;
+	SlotLockedFlashTimers[SlotIndex] = 0.85f;
+
+	if (LockedWarningBadgeTextBlock.IsValid())
+	{
+		LockedWarningBadgeTextBlock->SetText(FText::FromString(
+			bIsV3 ? TEXT("⚠  LOCKED ABILITY  ·  3번 키  ⚠") : TEXT("⚠  LOCKED ABILITY  ·  2번 키  ⚠")
+		));
+	}
+	if (LockedWarningTitleTextBlock.IsValid())
+	{
+		LockedWarningTitleTextBlock->SetText(FText::FromString(
+			bIsV3
+				? TEXT("🔒 아직 잠긴 능력입니다! (V3 긴급 탈출)")
+				: TEXT("🔒 아직 잠긴 능력입니다! (V2 그물 촉수)")
+		));
+	}
+	if (LockedWarningDetailTextBlock.IsValid())
+	{
+		LockedWarningDetailTextBlock->SetText(FText::FromString(FString::Printf(
+			TEXT("포식자 %d마리 처치 시 해금  (현재 %d / %d · %d마리 남음)"),
+			ClampedRequired, ClampedCurrent, ClampedRequired, RemainingDefeats
+		)));
+	}
+}
+
+void USpaceDrifterHUDWidget::RefreshLockedAbilityWarning(float InDeltaTime)
+{
+	for (int32 i = 0; i < 3; ++i)
+	{
+		if (SlotLockedFlashTimers[i] > 0.0f)
+		{
+			SlotLockedFlashTimers[i] = FMath::Max(SlotLockedFlashTimers[i] - InDeltaTime, 0.0f);
+		}
+	}
+
+	if (!LockedWarningOuterBorder.IsValid())
+	{
+		return;
+	}
+
+	if (LockedWarningRemainingSeconds <= KINDA_SMALL_NUMBER)
+	{
+		LockedWarningRemainingSeconds = 0.0f;
+		LockedWarningOuterBorder->SetVisibility(EVisibility::Collapsed);
+		LockedWarningOuterBorder->SetRenderTransform(FSlateRenderTransform());
+		return;
+	}
+
+	LockedWarningRemainingSeconds = FMath::Max(LockedWarningRemainingSeconds - InDeltaTime, 0.0f);
+	const float Elapsed = LockedWarningTotalSeconds - LockedWarningRemainingSeconds;
+
+	// 빠른 등장 페이드 + 부드러운 퇴장 페이드
+	const float FadeIn = FMath::Clamp(Elapsed / 0.12f, 0.0f, 1.0f);
+	const float FadeOut = FMath::Clamp(LockedWarningRemainingSeconds / 0.40f, 0.0f, 1.0f);
+	const float Alpha = FMath::Min(FadeIn, FadeOut);
+
+	// 탄성 스케일 팝 (0.76 -> 1.09 오버슈트 -> 1.00 안정)
+	float Scale = 1.0f;
+	if (Elapsed < 0.10f)
+	{
+		Scale = FMath::Lerp(0.76f, 1.09f, Elapsed / 0.10f);
+	}
+	else if (Elapsed < 0.22f)
+	{
+		Scale = FMath::Lerp(1.09f, 1.00f, (Elapsed - 0.10f) / 0.12f);
+	}
+
+	// 감쇠 수평 셰이크 (잠김 거절 피드백)
+	const float ShakeX = FMath::Sin(Elapsed * 46.0f) * 11.0f * FMath::Exp(-Elapsed * 7.5f);
+
+	// 붉은색 <-> 앰버 발광 프레임 펄스
+	const float GlowWave = 0.5f + 0.5f * FMath::Sin(Elapsed * 18.0f);
+	const FLinearColor BorderColor(
+		1.0f,
+		FMath::Lerp(0.18f, 0.64f, GlowWave),
+		FMath::Lerp(0.12f, 0.18f, GlowWave),
+		(0.84f + 0.16f * GlowWave) * Alpha
+	);
+
+	LockedWarningOuterBorder->SetVisibility(EVisibility::HitTestInvisible);
+	LockedWarningOuterBorder->SetRenderOpacity(Alpha);
+	LockedWarningOuterBorder->SetRenderTransformPivot(FVector2D(0.5, 0.5));
+	LockedWarningOuterBorder->SetRenderTransform(FSlateRenderTransform(Scale, FVector2f(ShakeX, 0.0f)));
+	LockedWarningOuterBorder->SetBorderBackgroundColor(BorderColor);
+
+	if (LockedWarningInnerBorder.IsValid())
+	{
+		LockedWarningInnerBorder->SetBorderBackgroundColor(FLinearColor(
+			FMath::Lerp(0.13f, 0.22f, GlowWave),
+			0.02f,
+			0.04f,
+			0.96f * Alpha
+		));
 	}
 }
 
@@ -1588,7 +2180,8 @@ void USpaceDrifterHUDWidget::RefreshEnemyIndicator(const FGeometry& MyGeometry)
 		return;
 	}
 
-	const FVector2D LocalSize = MyGeometry.GetLocalSize();
+	const FVector2D RawLocalSize = MyGeometry.GetLocalSize();
+	const FVector2D LocalSize = (CurrentUIScale > KINDA_SMALL_NUMBER) ? (RawLocalSize / CurrentUIScale) : RawLocalSize;
 	if (LocalSize.X <= 1.0f || LocalSize.Y <= 1.0f)
 	{
 		HideAllMarkers();
@@ -1995,7 +2588,9 @@ void USpaceDrifterHUDWidget::UpdateTendrilSlotHighlight(ETendrilVisualStyle Acti
 		const bool bUnlocked = !Pawn || Pawn->IsTendrilStyleUnlocked(SlotStyles[i]);
 		const bool bActive = bUnlocked && (i == ActiveIndex);
 		const bool bUnlockGlowing = bUnlocked && (SlotUnlockGlowTimers[i] > KINDA_SMALL_NUMBER);
+		const bool bLockedFlashing = !bUnlocked && (SlotLockedFlashTimers[i] > KINDA_SMALL_NUMBER);
 		const float UnlockPulse = bUnlockGlowing ? (0.55f + 0.45f * FMath::Sin(TitlePulseTime * 12.0f)) : 0.0f;
+		const float LockedFlashPulse = bLockedFlashing ? (0.55f + 0.45f * FMath::Sin(TitlePulseTime * 22.0f)) : 0.0f;
 		const FLinearColor UnlockColor = (i == 2)
 			? FLinearColor(1.0f, 0.80f, 0.22f, 1.0f)
 			: FLinearColor(0.18f, 0.94f, 1.0f, 1.0f);
@@ -2018,7 +2613,9 @@ void USpaceDrifterHUDWidget::UpdateTendrilSlotHighlight(ETendrilVisualStyle Acti
 		{
 			if (!bUnlocked)
 			{
-				SlotAccentBorders[i]->SetBorderBackgroundColor(FLinearColor(0.14f, 0.16f, 0.22f, 0.45f));
+				SlotAccentBorders[i]->SetBorderBackgroundColor(bLockedFlashing
+					? FLinearColor(1.0f, FMath::Lerp(0.20f, 0.56f, LockedFlashPulse), 0.14f, 0.98f)
+					: FLinearColor(0.14f, 0.16f, 0.22f, 0.45f));
 			}
 			else if (bUnlockGlowing)
 			{
@@ -2037,7 +2634,9 @@ void USpaceDrifterHUDWidget::UpdateTendrilSlotHighlight(ETendrilVisualStyle Acti
 		{
 			if (!bUnlocked)
 			{
-				SlotBorders[i]->SetBorderBackgroundColor(FLinearColor(0.02f, 0.03f, 0.05f, 0.56f));
+				SlotBorders[i]->SetBorderBackgroundColor(bLockedFlashing
+					? FLinearColor(0.26f * LockedFlashPulse + 0.08f, 0.03f, 0.04f, 0.92f)
+					: FLinearColor(0.02f, 0.03f, 0.05f, 0.56f));
 			}
 			else if (bUnlockGlowing)
 			{
@@ -2132,32 +2731,200 @@ EVisibility USpaceDrifterHUDWidget::GetGameOverOverlayVisibility() const
 	return (Pawn && Pawn->IsRunEnded()) ? EVisibility::Visible : EVisibility::Collapsed;
 }
 
-void USpaceDrifterHUDWidget::OnNameTextChanged(const FText& NewText)
+EVisibility USpaceDrifterHUDWidget::GetPauseMenuOverlayVisibility() const
+{
+	const ASpaceDrifterPlayerController* PC = OwnerPC.Get();
+	const ASpaceDrifterPawn* Pawn = OwnerPawn.Get();
+	if (!PC || !PC->IsPauseMenuOpen() || (Pawn && Pawn->IsRunEnded()))
+	{
+		return EVisibility::Collapsed;
+	}
+	return EVisibility::Visible;
+}
+
+void USpaceDrifterHUDWidget::RefreshPauseMenuSettingsDisplay()
+{
+	static constexpr float ScalePresets[NumUIScalePresets] = { 0.75f, 0.90f, 1.00f, 1.15f, 1.30f };
+	static const TCHAR* QualityNames[NumQualityLevels] = { TEXT("낮음"), TEXT("보통"), TEXT("높음"), TEXT("에픽") };
+
+	const FLinearColor ActiveBg(0.14f, 0.44f, 0.38f, 0.98f);
+	const FLinearColor InactiveBg(0.08f, 0.12f, 0.19f, 0.94f);
+	const FLinearColor ActiveText(0.94f, 1.0f, 0.98f, 1.0f);
+	const FLinearColor InactiveText(0.72f, 0.80f, 0.90f, 0.90f);
+
+	int32 ActiveScaleIdx = 2;
+	float BestScaleDiff = FLT_MAX;
+	for (int32 i = 0; i < NumUIScalePresets; ++i)
+	{
+		const float Diff = FMath::Abs(CurrentUIScale - ScalePresets[i]);
+		if (Diff < BestScaleDiff)
+		{
+			BestScaleDiff = Diff;
+			ActiveScaleIdx = i;
+		}
+	}
+
+	for (int32 i = 0; i < NumUIScalePresets; ++i)
+	{
+		const bool bSelected = (i == ActiveScaleIdx);
+		if (PauseUIScaleBtnBorders[i].IsValid())
+		{
+			PauseUIScaleBtnBorders[i]->SetBorderBackgroundColor(bSelected ? ActiveBg : InactiveBg);
+		}
+		if (PauseUIScaleBtnTexts[i].IsValid())
+		{
+			PauseUIScaleBtnTexts[i]->SetColorAndOpacity(FSlateColor(bSelected ? ActiveText : InactiveText));
+		}
+	}
+
+	int32 TextureQuality = 2;
+	int32 OverallQuality = 2;
+	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
+	{
+		TextureQuality = FMath::Clamp(Settings->GetTextureQuality(), 0, NumQualityLevels - 1);
+		OverallQuality = Settings->GetOverallScalabilityLevel();
+	}
+
+	for (int32 i = 0; i < NumQualityLevels; ++i)
+	{
+		const bool bTexSelected = (i == TextureQuality);
+		if (PauseTexQualityBtnBorders[i].IsValid())
+		{
+			PauseTexQualityBtnBorders[i]->SetBorderBackgroundColor(bTexSelected ? ActiveBg : InactiveBg);
+		}
+		if (PauseTexQualityBtnTexts[i].IsValid())
+		{
+			PauseTexQualityBtnTexts[i]->SetColorAndOpacity(FSlateColor(bTexSelected ? ActiveText : InactiveText));
+		}
+
+		const bool bGfxSelected = (OverallQuality >= 0 && OverallQuality < NumQualityLevels && i == OverallQuality);
+		if (PauseGfxQualityBtnBorders[i].IsValid())
+		{
+			PauseGfxQualityBtnBorders[i]->SetBorderBackgroundColor(bGfxSelected ? ActiveBg : InactiveBg);
+		}
+		if (PauseGfxQualityBtnTexts[i].IsValid())
+		{
+			PauseGfxQualityBtnTexts[i]->SetColorAndOpacity(FSlateColor(bGfxSelected ? ActiveText : InactiveText));
+		}
+	}
+
+	if (PauseCurrentSettingsSummaryTextBlock.IsValid())
+	{
+		const TCHAR* TexLabel = QualityNames[FMath::Clamp(TextureQuality, 0, NumQualityLevels - 1)];
+		const TCHAR* GfxLabel = (OverallQuality >= 0 && OverallQuality < NumQualityLevels)
+			? QualityNames[OverallQuality]
+			: TEXT("사용자 지정");
+		PauseCurrentSettingsSummaryTextBlock->SetText(FText::FromString(FString::Printf(
+			TEXT("현재 적용: UI %d%% · 텍스처 %s · 전체 그래픽 %s"),
+			FMath::RoundToInt(CurrentUIScale * 100.0f),
+			TexLabel,
+			GfxLabel
+		)));
+	}
+}
+
+FReply USpaceDrifterHUDWidget::OnUIScaleSelected(int32 PresetIndex)
+{
+	static constexpr float ScalePresets[NumUIScalePresets] = { 0.75f, 0.90f, 1.00f, 1.15f, 1.30f };
+	const int32 ClampedIndex = FMath::Clamp(PresetIndex, 0, NumUIScalePresets - 1);
+	CurrentUIScale = ScalePresets[ClampedIndex];
+	RefreshPauseMenuSettingsDisplay();
+	return FReply::Handled();
+}
+
+FReply USpaceDrifterHUDWidget::OnTextureQualitySelected(int32 QualityLevel)
+{
+	const int32 ClampedLevel = FMath::Clamp(QualityLevel, 0, NumQualityLevels - 1);
+	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
+	{
+		Settings->SetTextureQuality(ClampedLevel);
+		Settings->ApplySettings(false);
+	}
+	RefreshPauseMenuSettingsDisplay();
+	return FReply::Handled();
+}
+
+FReply USpaceDrifterHUDWidget::OnGraphicsQualitySelected(int32 QualityLevel)
+{
+	const int32 ClampedLevel = FMath::Clamp(QualityLevel, 0, NumQualityLevels - 1);
+	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
+	{
+		Settings->SetOverallScalabilityLevel(ClampedLevel);
+		Settings->ApplySettings(false);
+	}
+	RefreshPauseMenuSettingsDisplay();
+	return FReply::Handled();
+}
+
+FReply USpaceDrifterHUDWidget::OnTitleOptionsClicked()
 {
 	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
 	{
-		PC->SetCurrentPlayerName(NewText.ToString(), false);
+		PC->SetPauseMenuOpen(true);
+	}
+	return FReply::Handled();
+}
+
+FReply USpaceDrifterHUDWidget::OnPauseResumeClicked()
+{
+	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
+	{
+		PC->SetPauseMenuOpen(false);
+	}
+	return FReply::Handled();
+}
+
+FReply USpaceDrifterHUDWidget::OnPauseRestartClicked()
+{
+	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
+	{
+		PC->RestartFromPauseMenu();
+	}
+	return FReply::Handled();
+}
+
+FReply USpaceDrifterHUDWidget::OnPauseQuitClicked()
+{
+	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
+	{
+		PC->QuitGameFromPauseMenu();
+	}
+	return FReply::Handled();
+}
+
+void USpaceDrifterHUDWidget::OnNameTextChanged(const FText& NewText)
+{
+	const FString Raw = NewText.ToString();
+	const bool bHasSpace = Raw.Contains(TEXT(" "));
+
+	FString Sanitized = Raw;
+	Sanitized.ReplaceInline(TEXT(" "), TEXT(""));
+	Sanitized.ReplaceInline(TEXT("\t"), TEXT(""));
+
+	if (Sanitized != Raw && NameInputTextBox.IsValid())
+	{
+		NameInputTextBox->SetText(FText::FromString(Sanitized));
+	}
+
+	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
+	{
+		PC->SetCurrentPlayerName(Sanitized, bHasSpace);
+		if (bHasSpace && PC->IsInTitleScreen())
+		{
+			PC->StartGameplayFromTitle();
+		}
 	}
 }
 
 void USpaceDrifterHUDWidget::OnNameTextCommitted(const FText& NewText, ETextCommit::Type CommitType)
 {
+	FString Sanitized = NewText.ToString();
+	Sanitized.ReplaceInline(TEXT(" "), TEXT(""));
+	Sanitized.ReplaceInline(TEXT("\t"), TEXT(""));
+
 	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
 	{
-		PC->SetCurrentPlayerName(NewText.ToString(), true);
-		if (CommitType == ETextCommit::OnEnter)
-		{
-			PC->SetNameInputFocused(false);
-			if (FSlateApplication::IsInitialized())
-			{
-				FSlateApplication::Get().SetUserFocusToGameViewport(0);
-			}
-			if (NameConfirmHintTextBlock.IsValid())
-			{
-				NameConfirmHintTextBlock->SetText(FText::FromString(FString::Printf(TEXT("확정됨: %s · SPACE로 시작!"), *PC->GetCurrentPlayerName())));
-				NameConfirmHintTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.42f, 1.0f, 0.80f, 1.0f)));
-			}
-		}
+		PC->SetCurrentPlayerName(Sanitized, true);
 	}
 }
 

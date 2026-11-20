@@ -89,6 +89,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "100.0", ClampMax = "5000.0"))
 	float MaxChaseSpeedCmPerSec = 480.0f;
 
+	/** 포식자와 플레이어 간 표면 거리가 이 값(cm)을 넘으면 원거리 추격 속도 가속이 시작됩니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "200.0", ClampMax = "10000.0"))
+	float DistanceSpeedBoostStartCm = 1200.0f;
+
+	/** 원거리 추격 속도 배율이 최대치에 도달하는 표면 거리(cm)입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "500.0", ClampMax = "20000.0"))
+	float DistanceSpeedBoostMaxDistCm = 4800.0f;
+
+	/** 플레이어와 멀어질수록 적용되는 최대 추격 속도·가속도 배율입니다(1.0 = 거리 보정 없음). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "1.0", ClampMax = "6.0"))
+	float MaxDistanceSpeedMultiplier = 2.6f;
+
 	/** 플레이어 이동 방향을 앞질러 추격할 예측 시간(초)입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|AI", meta = (ClampMin = "0.0", ClampMax = "2.5"))
 	float LeadPursuitSeconds = 0.55f;

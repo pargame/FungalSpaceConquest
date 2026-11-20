@@ -287,7 +287,7 @@ void ASpaceDrifterPawn::OnSelectTendrilV1()
 {
 	if (const ASpaceDrifterPlayerController* PC = Cast<ASpaceDrifterPlayerController>(GetController()))
 	{
-		if (PC->IsInTitleScreen()) { return; }
+		if (PC->IsInTitleScreen() || PC->IsPauseMenuOpen()) { return; }
 	}
 	SetTendrilVisualStyle(ETendrilVisualStyle::MyceliumWeb);
 }
@@ -296,7 +296,7 @@ void ASpaceDrifterPawn::OnSelectTendrilV2()
 {
 	if (const ASpaceDrifterPlayerController* PC = Cast<ASpaceDrifterPlayerController>(GetController()))
 	{
-		if (PC->IsInTitleScreen()) { return; }
+		if (PC->IsInTitleScreen() || PC->IsPauseMenuOpen()) { return; }
 	}
 	SetTendrilVisualStyle(ETendrilVisualStyle::GossamerSpores);
 }
@@ -305,7 +305,7 @@ void ASpaceDrifterPawn::OnSelectTendrilV3()
 {
 	if (const ASpaceDrifterPlayerController* PC = Cast<ASpaceDrifterPlayerController>(GetController()))
 	{
-		if (PC->IsInTitleScreen()) { return; }
+		if (PC->IsInTitleScreen() || PC->IsPauseMenuOpen()) { return; }
 	}
 	SetTendrilVisualStyle(ETendrilVisualStyle::SporeJet);
 }
@@ -319,7 +319,7 @@ void ASpaceDrifterPawn::DoLook(float Yaw, float Pitch)
 	}
 	if (const ASpaceDrifterPlayerController* DrifterPC = Cast<ASpaceDrifterPlayerController>(GetController()))
 	{
-		if (DrifterPC->IsInTitleScreen() || IsRunEnded())
+		if (DrifterPC->IsInTitleScreen() || DrifterPC->IsPauseMenuOpen() || IsRunEnded())
 		{
 			return;
 		}
@@ -692,7 +692,7 @@ void ASpaceDrifterPawn::SetTendrilExtending(bool bExtend)
 	{
 		if (const ASpaceDrifterPlayerController* PC = Cast<ASpaceDrifterPlayerController>(GetController()))
 		{
-			if (PC->IsInTitleScreen() || PC->IsSuppressingTendrilUntilSpaceRelease())
+			if (PC->IsInTitleScreen() || PC->IsPauseMenuOpen() || PC->IsSuppressingTendrilUntilSpaceRelease())
 			{
 				return;
 			}
@@ -760,14 +760,13 @@ void ASpaceDrifterPawn::SetTendrilVisualStyle(ETendrilVisualStyle NewStyle)
 	if (!IsTendrilStyleUnlocked(NewStyle))
 	{
 		const int32 Required = GetRequiredDefeatsForStyle(NewStyle);
-		const TCHAR* SkillName = (NewStyle == ETendrilVisualStyle::GossamerSpores)
-			? TEXT("V2 그물 촉수")
-			: TEXT("V3 긴급 탈출");
-		PostTendrilStatusBanner(
-			FString::Printf(TEXT("[잠금] %s — 포식자 처치 %d/%d 달성 시 해금!"), SkillName, DefeatedEnemyCount, Required),
-			FLinearColor(1.0f, 0.70f, 0.28f, 1.0f),
-			1.6f
-		);
+		if (const ASpaceDrifterPlayerController* PC = Cast<ASpaceDrifterPlayerController>(GetController()))
+		{
+			if (USpaceDrifterHUDWidget* HUD = PC->GetHUDWidget())
+			{
+				HUD->TriggerLockedAbilityWarning(NewStyle, Required, DefeatedEnemyCount);
+			}
+		}
 		return;
 	}
 
@@ -832,11 +831,17 @@ void ASpaceDrifterPawn::ToggleTendrilVisualStyle()
 		}
 	}
 
-	PostTendrilStatusBanner(
-		FString::Printf(TEXT("[잠금] 포식자 처치 %d/%d 달성 시 V2 그물 촉수 해금!"), DefeatedEnemyCount, FMath::Max(V2UnlockDefeatedEnemyCount, 0)),
-		FLinearColor(1.0f, 0.70f, 0.28f, 1.0f),
-		1.5f
-	);
+	if (const ASpaceDrifterPlayerController* PC = Cast<ASpaceDrifterPlayerController>(GetController()))
+	{
+		if (USpaceDrifterHUDWidget* HUD = PC->GetHUDWidget())
+		{
+			HUD->TriggerLockedAbilityWarning(
+				ETendrilVisualStyle::GossamerSpores,
+				FMath::Max(V2UnlockDefeatedEnemyCount, 0),
+				DefeatedEnemyCount
+			);
+		}
+	}
 }
 
 float ASpaceDrifterPawn::GetInvestedColonizeBiomass() const

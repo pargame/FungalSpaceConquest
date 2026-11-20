@@ -54,6 +54,26 @@ public:
 	/** 판 종료 시 UI 조작(초기화 버튼·SPACE 재시작) 모드로 전환합니다. */
 	void NotifyRunEnded();
 
+	/** 현재 ESC 일시정지 메뉴가 열려 있는지 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "UI")
+	bool IsPauseMenuOpen() const { return bIsPauseMenuOpen; }
+
+	/** 인게임 플레이 중 ESC 일시정지 메뉴를 토글합니다. */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void TogglePauseMenu();
+
+	/** 일시정지 메뉴를 명시적으로 열거나 닫습니다. */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void SetPauseMenuOpen(bool bOpen);
+
+	/** 일시정지 메뉴에서 현재 레벨을 다시 시작합니다. */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void RestartFromPauseMenu();
+
+	/** 일시정지 메뉴에서 게임을 종료합니다. */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void QuitGameFromPauseMenu();
+
 	/** 현재 생성된 HUD 위젯 인스턴스를 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "UI")
 	USpaceDrifterHUDWidget* GetHUDWidget() const { return HUDWidgetInstance.Get(); }
@@ -70,6 +90,7 @@ protected:
 private:
 	void OnTitleConfirmKeyPressed();
 	void OnTitleConfirmKeyReleased();
+	void OnPauseMenuKeyPressed();
 	void EnsureHUDCreated();
 
 	UPROPERTY(Transient)
@@ -79,5 +100,6 @@ private:
 	bool bIsInTitleScreen = false;
 	bool bIsNameInputFocused = false;
 	bool bSuppressTendrilUntilSpaceRelease = false;
+	bool bIsPauseMenuOpen = false;
 	double RunEndedWorldTime = -100.0;
 };

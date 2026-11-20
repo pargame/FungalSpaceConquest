@@ -10,15 +10,19 @@ struct FSpaceLeaderboardEntry
 {
 	GENERATED_BODY()
 
+	/** 리더보드에 표시할 플레이어 이름입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	FString PlayerName = TEXT("익명 곰팡이");
 
+	/** 해당 판에서 역포식으로 처치한 포식자 수입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	int32 DefeatedEnemies = 0;
 
+	/** 해당 판에서 도달한 최대 본체 반지름(m)입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	float MaxRadiusMeters = 0.75f;
 
+	/** 해당 판에서 흡수한 총 미네랄 개수입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	int32 AbsorbedMinerals = 0;
 

@@ -454,7 +454,12 @@ void AEnemyMoldManager::Tick(float DeltaTime)
 			{
 				if (EnemySphere->IsSimulatingPhysics())
 				{
-					const float SpeedMul = Enemy->GetMoveSpeedMultiplier();
+					// 플레이어와 멀어질수록 포식자 추격 속도·가속도를 점진적으로 증폭 (원거리 추격 보정)
+					const float BoostSpan = FMath::Max(DistanceSpeedBoostMaxDistCm - DistanceSpeedBoostStartCm, 100.0f);
+					const float DistanceBoostAlpha = FMath::Clamp((SurfaceDist - DistanceSpeedBoostStartCm) / BoostSpan, 0.0f, 1.0f);
+					const float DistanceSpeedMul = FMath::Lerp(1.0f, FMath::Max(MaxDistanceSpeedMultiplier, 1.0f), DistanceBoostAlpha);
+
+					const float SpeedMul = Enemy->GetMoveSpeedMultiplier() * DistanceSpeedMul;
 					const float EffectiveMaxSpeed = FMath::Max(MaxChaseSpeedCmPerSec * SpeedMul, 40.0f);
 					const float EffectiveAccel = ChaseAcceleration * SpeedMul;
 

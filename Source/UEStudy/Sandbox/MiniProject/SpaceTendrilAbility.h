@@ -186,63 +186,83 @@ public:
 	int32 ComputeCurrentBranchCount() const;
 	void PushLongTendrilParametersToFX(UFXSystemComponent* TargetFX);
 
+	/** 긴 촉수(V1) 본 가지 최대 사거리(cm)입니다. (실행 시 폰의 LongTendrilMaxLength 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float MaxLengthCm = 1800.0f;
 
+	/** 긴 촉수(V1) 본 가지 뿌리 쪽 시작 굵기(cm)입니다. (실행 시 폰의 LongTendrilTrunkWidth 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float TrunkWidthCm = 11.5f;
 
+	/** 긴 촉수(V1) 뿌리 대비 끝단 굵기 테이퍼 비율입니다. (실행 시 폰의 LongTendrilTipWidthRatio 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float TipWidthRatio = 0.08f;
 
+	/** 긴 촉수(V1) 본 가지 1m당 생성되는 곁가지 빈도(개/m)입니다. (실행 시 폰의 LongTendrilBranchFrequency 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float BranchFrequency = 0.70f;
 
+	/** 곁가지가 생성되기 시작하는 최소 본 가지 길이(cm)입니다. (실행 시 폰의 LongTendrilBranchMinTrunkCm 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float BranchMinTrunkCm = 420.0f;
 
+	/** 긴 촉수(V1) 끝단 부근 곁가지의 최대 기준 길이(cm)입니다. (실행 시 폰의 LongTendrilBranchLength 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float BranchLengthCm = 180.0f;
 
+	/** 긴 촉수(V1) 곁가지의 시작 굵기(cm)입니다. (실행 시 폰의 LongTendrilBranchWidth 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float BranchWidthCm = 4.8f;
 
+	/** 끝단 대비 뿌리쪽 곁가지의 길이·굵기·퍼짐 비율입니다. (실행 시 폰의 LongTendrilBaseToTipLengthRatio 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float BaseToTipLengthRatio = 0.35f;
 
+	/** 본 가지 전체 길이 중 곁가지가 처음 돋아나는 시작 위치 비율(0.02~0.90)입니다. (실행 시 폰의 LongTendrilBranchStartRatio 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float BranchStartRatio = 0.22f;
 
+	/** 곁가지들이 옆으로 퍼지는 각도·폭 배율입니다. (실행 시 폰의 LongTendrilBranchSpreadScale 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float BranchSpreadScale = 1.0f;
 
+	/** 긴 촉수(V1) 최대 길이 도달 후 유지 시간 제한 사용 여부입니다. (실행 시 폰의 bLimitLongTendrilHoldDuration 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	bool bLimitHoldDuration = true;
 
+	/** 긴 촉수(V1) 최대 길이 상태로 유지할 수 있는 최대 시간(초)입니다. (실행 시 폰의 LongTendrilMaxHoldDuration 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float MaxHoldDurationSeconds = 1.5f;
 
+	/** 소행성·포식자에 꽂혀 있는 동안에도 최대 유지 시간 제한을 적용할지 여부입니다. (실행 시 폰의 bLimitHoldDurationWhileLatched 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	bool bLimitHoldWhileLatched = false;
 
+	/** 카메라 중앙 조준 레이 주변을 포착하는 스피어 트레이스 반경(cm)입니다. (실행 시 폰의 TendrilAimTraceRadius 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float AimTraceRadiusCm = 14.0f;
 
+	/** 락온 대상과 플레이어를 서로 끌어당기는 기본 인력 세기(Chaos Force)입니다. (실행 시 폰의 TendrilPullForce 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float PullForce = 240000.0f;
 
+	/** 촉수로 끌어당길 때 대상과의 기본 최대 상대 접근 속력(cm/s)입니다. (실행 시 폰의 MaxRelativePullSpeed 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float MaxRelativePullSpeedCmPerSec = 1100.0f;
 
+	/** 꽂힌 표면 지점의 편심 회전 토크를 소행성에 전달하는 비율(0~1)입니다. (실행 시 폰의 TendrilTorqueTransferRatio 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float TorqueTransferRatio = 0.25f;
 
+	/** 촉수가 목표 표면까지 뻗어나가 인력이 발동되기 시작하는 진행도(0~1) 임계값입니다. (실행 시 폰의 TendrilPullActivationAlpha 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float PullActivationAlpha = 0.85f;
 
+	/** 끌어당기는 중 락온된 대상과 물리 충돌했을 때 즉시 촉수를 해제할지 여부입니다. (실행 시 폰의 bAutoDetachTendrilOnTargetHit 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	bool bAutoDetachOnTargetHit = false;
 
+	/** 락온 상태에서 유효 사거리 대비 몇 배까지 벌어지면 촉수가 끊어질지 결정하는 배율입니다. (실행 시 폰의 MaxTetherBreakDistanceMultiplier 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LongTendril")
 	float MaxTetherBreakMultiplier = 1.45f;
 
@@ -338,18 +358,23 @@ public:
 	virtual FString GetAbilityDisplayName() const override { return TEXT("Tendril Style: V2 그물 촉수 (Net Tendril / One-Shot)"); }
 	virtual bool IsHoldToMaintainAbility() const override { return false; }
 
+	/** 그물 촉수(V2)가 한 번 발사되었을 때 최대로 펼쳐지는 기본 거리(cm)입니다. (실행 시 폰의 NetTendrilMaxReach 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril")
 	float MaxReachCm = 920.0f;
 
+	/** 그물 촉수(V2)가 회수될 때 되감기는 정규화 속도(1/s)입니다. (실행 시 폰의 NetTendrilRetractSpeed 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril")
 	float NetRetractSpeed = 2.6f;
 
+	/** 그물 촉수(V2) 발사 후 최대 전개 상태를 유지하는 시간(초)입니다. (실행 시 폰의 NetTendrilHoldDuration 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril")
 	float HoldDurationSeconds = 0.55f;
 
+	/** 그물 깔때기 반경 바깥쪽으로 미네랄 포획을 허용하는 여유 반경(cm)입니다. (실행 시 폰의 NetCapturePaddingCm 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril")
 	float CapturePaddingCm = 24.0f;
 
+	/** 본체 구체 반경 바깥쪽으로 직접 접촉 흡수를 허용하는 여유 거리(cm)입니다. (실행 시 폰의 직접 접촉 흡수 설정으로 자동 계산됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril")
 	float DirectContactMarginCm = 24.0f;
 
@@ -381,15 +406,32 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|Slow", meta = (ClampMin = "0.0", ClampMax = "50.0"))
 	float WebShrinkPercentPerHit = 15.0f;
 
-	/** V2 축소로 줄어들 수 있는 포식자 최소 반지름 하한(초기 스폰 반지름 대비 비율)입니다. */
+	/** 그물 촉수(V2) 유지 시간 시인성 보정 배율입니다(폰 동기화 HoldDurationSeconds에 곱해져 그물이 충분히 오래 보이도록 합니다). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|Visibility", meta = (ClampMin = "0.5", ClampMax = "6.0"))
+	float NetVisibilityHoldMultiplier = 2.5f;
+
+	/** 그물 촉수(V2) 최대 전개 상태 최소 유지 시간(초) 하한입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|Visibility", meta = (ClampMin = "0.0", ClampMax = "10.0"))
+	float MinHoldDurationSeconds = 1.35f;
+
+	/** 그물 촉수(V2) 회수 속도 배율입니다(1.0 미만으로 낮춰 그물이 너무 빨리 사라지지 않고 부드럽게 회수되게 합니다). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|Visibility", meta = (ClampMin = "0.15", ClampMax = "2.0"))
+	float NetRetractSpeedScale = 0.45f;
+
+	/** 그물 촉수(V2) 나이아가라 포자(GossamerSporesFX) 최대 생성률(User.SporeSpawnRate)입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|Visibility", meta = (ClampMin = "10.0", ClampMax = "400.0"))
+	float NetSporeSpawnRate = 95.0f;
+
+	/** V2 광역 축소로 줄어들 수 있는 포식자 최소 반지름 하한(초기 스폰 반지름 대비 비율)입니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|Slow", meta = (ClampMin = "0.25", ClampMax = "0.95"))
 	float WebMinShrinkRadiusRatio = 0.50f;
 
 protected:
+	virtual void LatchCameraAimBasis() override;
 	virtual void OnAbilityActivated() override;
 	virtual void OnActiveTick(float DeltaTime, const FVector& VisualOrigin, const FVector& StartPos, const FVector& EndPos, float EasedReach) override;
 	virtual void OnAbilityReturnedToIdle() override;
-	virtual float GetHoldDurationLimitSeconds() const override { return FMath::Max(HoldDurationSeconds, 0.0f); }
+	virtual float GetHoldDurationLimitSeconds() const override;
 	virtual float GetEffectiveReachCm() const override;
 
 private:
@@ -438,6 +480,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JetTendril|Biomass", meta = (ClampMin = "0.0", ClampMax = "100.0"))
 	float DashMinBiomassCost = 4.0f;
 
+	/** V3 지속 분사 시 기본 추진 가속도(cm/s²)입니다(레거시 호환용, 실행 시 폰의 JetTendrilThrustAccel 값으로 자동 동기화됨). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JetTendril")
 	float ThrustAccelerationCmPerSec2 = 1400.0f;
 
@@ -449,9 +492,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JetTendril", meta = (ClampMin = "0.0"))
 	float SpeedInverseDecayRatio = 1.2f;
 
+	/** V3 분사 나이아가라 이펙트의 기준 길이(cm)입니다. (실행 시 폰의 JetTendrilVisualLength 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JetTendril")
 	float VisualReachCm = 720.0f;
 
+	/** V3 분사 시 초당 포자 입자 생성 배율입니다. (실행 시 폰의 JetTendrilSpawnRate 값으로 자동 동기화됨) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JetTendril")
 	float ProjectileSpawnRateScale = 160.0f;
 

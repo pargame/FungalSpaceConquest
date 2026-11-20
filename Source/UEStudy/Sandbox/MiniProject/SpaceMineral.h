@@ -129,6 +129,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UProceduralMeshComponent> MineralMesh;
 
+	/** 미네랄 크리스탈 메시에 적용할 머티리얼입니다(비워 두면 기본 머티리얼 자동 적용). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SpaceMineral|Visual")
 	TObjectPtr<UMaterialInterface> MineralMaterial;
 

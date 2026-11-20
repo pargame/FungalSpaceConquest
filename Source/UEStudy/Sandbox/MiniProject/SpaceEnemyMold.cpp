@@ -331,8 +331,17 @@ void ASpaceEnemyMold::ApplyWebSlow(float DurationSeconds, float SpeedMultiplier)
 		return;
 	}
 
-	bIsWebSlowed = true;
-	WebSlowSpeedMultiplier = FMath::Clamp(SpeedMultiplier, 0.1f, 1.0f);
+	const float TargetMul = FMath::Clamp(SpeedMultiplier, 0.1f, 1.0f);
+	if (bIsWebSlowed)
+	{
+		// 이미 그물에 걸린 포식자가 다시 맞으면 영구 이동속도가 추가 감소 (최소 20% 하한)
+		WebSlowSpeedMultiplier = FMath::Max(FMath::Min(WebSlowSpeedMultiplier * 0.85f, TargetMul), 0.20f);
+	}
+	else
+	{
+		bIsWebSlowed = true;
+		WebSlowSpeedMultiplier = TargetMul;
+	}
 
 	// 그물에 감긴 순간 즉각 속력을 꺾어 속박 손맛 부여
 	if (CollisionSphere && CollisionSphere->IsSimulatingPhysics())
@@ -343,20 +352,16 @@ void ASpaceEnemyMold::ApplyWebSlow(float DurationSeconds, float SpeedMultiplier)
 
 	if (EnemyMID)
 	{
-		EnemyMID->SetVectorParameterValue(TEXT("RimColor"), FLinearColor(0.35f, 0.88f, 1.0f, 1.0f));
+		// 사냥 가능(녹색/시안)과 혼동되지 않도록 약화(위협 유지) 상태는 보라/마젠타 림 색상으로 표시
+		EnemyMID->SetVectorParameterValue(TEXT("RimColor"), FLinearColor(0.72f, 0.14f, 0.82f, 1.0f));
 	}
 
+	// 영구 감소 적용: 만료 타이머를 돌리지 않고 처치(풀 반환)될 때까지 둔화 상태 유지
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(WebSlowTimerHandle);
-		World->GetTimerManager().SetTimer(
-			WebSlowTimerHandle,
-			this,
-			&ASpaceEnemyMold::OnWebSlowTimerExpired,
-			FMath::Max(DurationSeconds, 0.2f),
-			false
-		);
 	}
+	(void)DurationSeconds;
 }
 
 void ASpaceEnemyMold::OnWebSlowTimerExpired()

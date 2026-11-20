@@ -1197,7 +1197,7 @@ void UNetTendrilAbility::OnActiveTick(
 			{
 				const int32 TotalSlowed = SlowedEnemiesThisShot.Num();
 				HostIfc->PostTendrilStatusBanner(
-					FString::Printf(TEXT("포획망 적중! 포식자 %d마리 약화 (크기 -%.0f%% 축소 · 이속 %.0f%% 둔화)"), TotalSlowed, WebShrinkPercentPerHit, WebSlowSpeedMultiplier * 100.0f),
+					FString::Printf(TEXT("포획망 적중! 포식자 %d마리 영구 약화 (크기 -%.0f%% · 이속 %.0f%% 영구 감소)"), TotalSlowed, WebShrinkPercentPerHit, WebSlowSpeedMultiplier * 100.0f),
 					FLinearColor(0.32f, 0.94f, 1.0f, 1.0f),
 					2.2f
 				);

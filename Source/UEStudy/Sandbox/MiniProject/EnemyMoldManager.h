@@ -69,6 +69,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|Spawn", meta = (ClampMin = "0.5", ClampMax = "30.0"))
 	float EmptyFieldRespawnCooldownSeconds = 2.0f;
 
+	/** 첫 포식자 출현 이후, 기본 리스폰/추가 스폰 간격 대비 적용되는 기본 단축 비율(%)입니다(예: 55% = 기본 간격의 55% 시간). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|Spawn", meta = (ClampMin = "10.0", ClampMax = "100.0"))
+	float PostFirstSpawnIntervalPercent = 55.0f;
+
+	/** 동시 최대 슬롯 대비 빈 슬롯 비율(VacancyRatio)이 높을수록 스폰 간격을 추가로 최대 몇 %까지 더 단축할지 결정합니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|Spawn", meta = (ClampMin = "0.0", ClampMax = "90.0"))
+	float VacancyMaxSpeedupPercent = 60.0f;
+
+	/** 단축 비율과 빈 슬롯 가속이 중첩되어도 기본 간격 대비 최소 이 비율(예: 0.15 = 15%) 아래로는 내려가지 않도록 보장하는 하한 비율입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|Spawn", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float MinRespawnIntervalRatioOfBase = 0.15f;
+
 	/** 카메라가 포식자 중심으로부터 (적 반지름 * 배율 + 45cm) 안쪽으로 침투하면 시각 메시를 숨겨 화면 가림·어지럼을 방지합니다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EnemyMold|Visual", meta = (ClampMin = "1.0", ClampMax = "3.0"))
 	float CameraOcclusionHideRadiusMultiplier = 1.65f;
@@ -175,6 +187,7 @@ private:
 
 	void PrewarmPool();
 	void ScheduleNextSpawn(float DelaySeconds, bool bForceReset = false);
+	float ComputeDynamicRespawnDelay(float BaseIntervalSeconds, int32 ActiveCount, int32 TargetMaxCount) const;
 	void OnSpawnTimerExpired();
 	bool TrySpawnOneEnemy(ASpaceDrifterPawn* PlayerPawn);
 	void UpdateAttackTickets(const ASpaceDrifterPawn* PlayerPawn, const FVector& PlayerLoc, float DeltaTime);

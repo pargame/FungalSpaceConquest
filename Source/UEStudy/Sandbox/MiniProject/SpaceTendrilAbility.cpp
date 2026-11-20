@@ -4,6 +4,7 @@
 
 #include "AsteroidFieldManager.h"
 #include "Components/PrimitiveComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EnemyMoldManager.h"
 #include "Engine/CollisionProfile.h"
@@ -12,6 +13,8 @@
 #include "FXSystemComponent.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
+#include "ProceduralMeshComponent.h"
 #include "SpaceAsteroid.h"
 #include "SpaceColonizableTarget.h"
 #include "SpaceDrifterPawn.h"
@@ -1101,6 +1104,13 @@ float UNetTendrilAbility::GetHoldDurationLimitSeconds() const
 	return FMath::Max(ScaledHold, FMath::Max(MinHoldDurationSeconds, 0.0f));
 }
 
+void UNetTendrilAbility::DeactivateAbilityImmediate()
+{
+	Super::DeactivateAbilityImmediate();
+	SlowedEnemiesThisShot.Reset();
+	HideCastNetMesh();
+}
+
 void UNetTendrilAbility::OnAbilityActivated()
 {
 	RetractSpeed = FMath::Max(NetRetractSpeed * FMath::Clamp(NetRetractSpeedScale, 0.15f, 2.0f), 0.45f);
@@ -1120,15 +1130,15 @@ void UNetTendrilAbility::OnActiveTick(
 		return;
 	}
 
-	// V2 그물이 포식자 곰팡이에 닿으면 그물에 감겨 일정 시간 이동속도 둔화
-	if (IsExtending() && EasedReach > 0.15f)
+	const UWorld* World = HostIfc->GetTendrilWorld();
+	const float TimeSec = World ? World->GetTimeSeconds() : 0.0f;
+
+	// V2 투망이 포식자 곰팡이에 닿으면 포획망에 감겨 즉시 감속·이동속도 둔화·크기 축소(약화)
+	if (IsExtending() && EasedReach > 0.08f)
 	{
-		if (!CachedEnemyManager.IsValid())
+		if (!CachedEnemyManager.IsValid() && World)
 		{
-			if (UWorld* World = HostIfc->GetTendrilWorld())
-			{
-				CachedEnemyManager = Cast<AEnemyMoldManager>(UGameplayStatics::GetActorOfClass(World, AEnemyMoldManager::StaticClass()));
-			}
+			CachedEnemyManager = Cast<AEnemyMoldManager>(UGameplayStatics::GetActorOfClass(World, AEnemyMoldManager::StaticClass()));
 		}
 
 		if (const AEnemyMoldManager* EnemyMgr = CachedEnemyManager.Get())
@@ -1136,14 +1146,8 @@ void UNetTendrilAbility::OnActiveTick(
 			TArray<ASpaceEnemyMold*> ActiveEnemies;
 			EnemyMgr->GatherActiveEnemies(ActiveEnemies);
 
-			const float EffectiveNetLen = FMath::Max(GetEffectiveReachCm() * EasedReach, 100.0f);
-			const UWorld* World = HostIfc->GetTendrilWorld();
-			const float TimeSec = World ? World->GetTimeSeconds() : 0.0f;
-			const float HostScale = FMath::Max(HostIfc->GetTendrilBodyScale(), 0.2f);
-			const float AoEScale = FMath::Pow(HostScale, FMath::Max(SizeScaleFunnelRadiusExponent, 0.0f));
-			const float BodyRadius = HostIfc->GetTendrilBodyRadius();
-			const float AoEMinR = FMath::Max(WebAoEMinRadiusCm, 100.0f) * AoEScale;
-			const float AoEMaxR = FMath::Max(WebAoEMaxRadiusCm, AoEMinR) * AoEScale;
+			const float EffectiveNetLen = FMath::Max(GetEffectiveReachCm() * EasedReach, 80.0f);
+			const float BodyRadius = FMath::Max(HostIfc->GetTendrilBodyRadius(), 20.0f);
 			const float SafeSlowDuration = (CooldownSeconds > 0.5f)
 				? FMath::Min(WebSlowDurationSeconds, CooldownSeconds - 0.5f)
 				: WebSlowDurationSeconds;
@@ -1159,24 +1163,30 @@ void UNetTendrilAbility::OnActiveTick(
 				const FVector EnemyLoc = Enemy->GetActorLocation();
 				const float EnemyRadius = Enemy->GetCurrentRadiusCm();
 				const float AlongDist = FVector::DotProduct(EnemyLoc - StartPos, LockedAimDir);
-				if (AlongDist < -(BodyRadius * 1.5f + EnemyRadius) || AlongDist > EffectiveNetLen + EnemyRadius + AoEMaxR * 0.25f)
+				if (AlongDist < -(BodyRadius * 1.2f + EnemyRadius) || AlongDist > EffectiveNetLen + EnemyRadius + BodyRadius * 1.5f)
 				{
 					continue;
 				}
 
 				const float NormT = FMath::Clamp(AlongDist / FMath::Max(EffectiveNetLen, 1.0f), 0.0f, 1.0f);
 				const FVector FunnelCenter = EvaluateFunnelCenter(StartPos, EffectiveNetLen, NormT, TimeSec);
-				const float FunnelR = EvaluateFunnelRadiusCm(NormT, EasedReach) + CapturePaddingCm;
-				const float WideAoER = FMath::Lerp(AoEMinR, AoEMaxR, NormT);
-				const float EffectiveHitRadius = FMath::Max(FunnelR, WideAoER) + EnemyRadius;
+				const float NetHitRadius = EvaluateFunnelRadiusCm(NormT, EasedReach) + CapturePaddingCm + EnemyRadius;
 
-				if (FVector::DistSquared(EnemyLoc, FunnelCenter) <= FMath::Square(EffectiveHitRadius))
+				if (FVector::DistSquared(EnemyLoc, FunnelCenter) <= FMath::Square(NetHitRadius))
 				{
 					SlowedEnemiesThisShot.Add(Enemy);
 					Enemy->ApplyWebSlow(SafeSlowDuration, WebSlowSpeedMultiplier);
 					if (WebShrinkPercentPerHit > KINDA_SMALL_NUMBER)
 					{
 						Enemy->ApplyWebShrink(WebShrinkPercentPerHit, WebMinShrinkRadiusRatio);
+					}
+					// 포획망에 걸린 즉각적인 타격감: 현재 이동 관성을 즉시 감쇄
+					if (USphereComponent* EnemySphere = Enemy->GetCollisionSphere())
+					{
+						if (EnemySphere->IsSimulatingPhysics())
+						{
+							EnemySphere->SetPhysicsLinearVelocity(EnemySphere->GetPhysicsLinearVelocity() * 0.30f);
+						}
 					}
 					++NewlySlowedCount;
 				}
@@ -1186,49 +1196,27 @@ void UNetTendrilAbility::OnActiveTick(
 			{
 				const int32 TotalSlowed = SlowedEnemiesThisShot.Num();
 				HostIfc->PostTendrilStatusBanner(
-					FString::Printf(TEXT("[V2 광역 그물!] 포식자 %d마리 둔화(%.0f%%) · 크기 -%.0f%% 축소!"), TotalSlowed, WebSlowSpeedMultiplier * 100.0f, WebShrinkPercentPerHit),
-					FLinearColor(0.38f, 0.90f, 1.0f, 1.0f),
-					1.8f
+					FString::Printf(TEXT("포획망 적중! 포식자 %d마리 약화 (크기 -%.0f%% 축소 · 이속 %.0f%% 둔화)"), TotalSlowed, WebShrinkPercentPerHit, WebSlowSpeedMultiplier * 100.0f),
+					FLinearColor(0.32f, 0.94f, 1.0f, 1.0f),
+					2.2f
 				);
 			}
 		}
 	}
 
+	// 기존 단일 긴 촉수형 나이아가라(GossamerSporesFX)는 비활성화하고, 시작부터 넓게 펼쳐지는 3D 투망 메시로 렌더링
 	if (UFXSystemComponent* FX = HostIfc->GetTendrilFXComponent(ETendrilVisualStyle::GossamerSpores))
 	{
-		FX->SetWorldLocation(StartPos);
-		if (!FX->IsVisible())
+		FX->SetFloatParameter(TEXT("User.TendrilAlpha"), 0.0f);
+		FX->SetFloatParameter(TEXT("User.TendrilReach"), 0.0f);
+		FX->SetFloatParameter(TEXT("User.SporeSpawnRate"), 0.0f);
+		if (FX->IsActive())
 		{
-			FX->SetVisibility(true);
-		}
-
-		if (bForceRestartFX)
-		{
-			bForceRestartFX = false;
-			if (FX->IsActive())
-			{
-				FX->DeactivateImmediate();
-			}
-		}
-
-		const float VisualAlpha = FMath::SmoothStep(0.0f, 0.08f, ExtendAlpha);
-		const float LateBloom = FMath::SmoothStep(0.15f, 0.70f, EasedReach);
-		const float EffectiveSpawnRate = FMath::Max(NetSporeSpawnRate, 10.0f) * VisualAlpha * (0.35f + 0.65f * LateBloom);
-
-		FX->SetVectorParameter(TEXT("User.TendrilStart"), StartPos);
-		FX->SetVectorParameter(TEXT("User.TendrilEnd"), EndPos);
-		FX->SetVectorParameter(TEXT("User.AimDir"), LockedAimDir);
-		FX->SetVectorParameter(TEXT("User.AimRight"), LockedAimRight);
-		FX->SetVectorParameter(TEXT("User.AimUp"), LockedAimUp);
-		FX->SetFloatParameter(TEXT("User.TendrilAlpha"), VisualAlpha);
-		FX->SetFloatParameter(TEXT("User.TendrilReach"), EasedReach);
-		FX->SetFloatParameter(TEXT("User.SporeSpawnRate"), EffectiveSpawnRate);
-
-		if (!FX->IsActive())
-		{
-			FX->Activate(true);
+			FX->Deactivate();
 		}
 	}
+
+	UpdateCastNetMesh(StartPos, EasedReach, TimeSec);
 }
 
 void UNetTendrilAbility::OnAbilityReturnedToIdle()
@@ -1237,12 +1225,12 @@ void UNetTendrilAbility::OnAbilityReturnedToIdle()
 	{
 		if (UFXSystemComponent* FX = HostIfc->GetTendrilFXComponent(ETendrilVisualStyle::GossamerSpores))
 		{
-			// SporeDrift 잔상 파티클이 자연스럽게 소멸하도록 SpawnRate와 Alpha만 0으로 내리고 다음 발사 시 bForceRestartFX로 재시작
 			FX->SetFloatParameter(TEXT("User.TendrilAlpha"), 0.0f);
 			FX->SetFloatParameter(TEXT("User.TendrilReach"), 0.0f);
 			FX->SetFloatParameter(TEXT("User.SporeSpawnRate"), 0.0f);
 		}
 	}
+	HideCastNetMesh();
 }
 
 FVector UNetTendrilAbility::EvaluateFunnelCenter(
@@ -1254,25 +1242,275 @@ FVector UNetTendrilAbility::EvaluateFunnelCenter(
 	const float ClampedT = FMath::Clamp(NormalizedT, 0.0f, 1.0f);
 	return StartPos
 		+ LockedAimDir * (MaxNetLenCm * ClampedT)
-		+ LockedAimRight * (FMath::Sin(TimeSec * 1.5f + ClampedT * 3.0f) * 5.0f * ClampedT)
-		+ LockedAimUp * (FMath::Cos(TimeSec * 1.3f + ClampedT * 2.5f) * 4.5f * ClampedT);
+		+ LockedAimRight * (FMath::Sin(TimeSec * 2.2f + ClampedT * 3.0f) * 3.5f * ClampedT)
+		+ LockedAimUp * (FMath::Cos(TimeSec * 1.9f + ClampedT * 2.5f) * 3.0f * ClampedT);
 }
 
 float UNetTendrilAbility::GetEffectiveReachCm() const
 {
-	const float HostScale = Host.GetInterface() ? FMath::Max(Host.GetInterface()->GetTendrilBodyScale(), 0.2f) : 1.0f;
-	const float ScaledReach = MaxReachCm * FMath::Pow(HostScale, FMath::Max(SizeScaleReachExponent, 0.0f));
-	return FMath::Clamp(ScaledReach, 120.0f, 50000.0f);
+	const float BodyRadius = Host.GetInterface() ? FMath::Max(Host.GetInterface()->GetTendrilBodyRadius(), 20.0f) : 75.0f;
+	const float ScaledReach = BodyRadius * FMath::Max(NetReachBodyRadiusMultiplier, 2.5f);
+	return FMath::Clamp(ScaledReach, 150.0f, 50000.0f);
 }
 
 float UNetTendrilAbility::EvaluateFunnelRadiusCm(float NormalizedT, float CurrentReachAlpha) const
 {
 	const float ClampedT = FMath::Clamp(NormalizedT, 0.0f, 1.0f);
-	const float U = FMath::Clamp((ClampedT - 0.36f) / 0.64f, 0.0f, 1.0f);
-	const float Bloom = FMath::Lerp(0.18f, 1.0f, FMath::Clamp((CurrentReachAlpha - 0.54f) / 0.46f, 0.0f, 1.0f));
-	const float HostScale = Host.GetInterface() ? FMath::Max(Host.GetInterface()->GetTendrilBodyScale(), 0.2f) : 1.0f;
-	const float FunnelScale = FMath::Pow(HostScale, FMath::Max(SizeScaleFunnelRadiusExponent, 0.0f));
-	return (11.0f * FMath::Sin(ClampedT * UE_PI) + 250.0f * (U * U * (0.25f + 0.75f * U)) * Bloom) * FunnelScale;
+	const float BodyRadius = Host.GetInterface() ? FMath::Max(Host.GetInterface()->GetTendrilBodyRadius(), 20.0f) : 75.0f;
+	const float StartR = BodyRadius * FMath::Max(NetStartSpreadBodyRadiusMultiplier, 0.5f);
+	const float MaxR = BodyRadius * FMath::Max(NetMaxSpreadBodyRadiusMultiplier, NetStartSpreadBodyRadiusMultiplier + 0.5f);
+
+	// 낚시배 투망처럼 시작부터 확 넓게 벌어지는 오목 곡선 (pow(t, 0.50))
+	const float BellCurve = FMath::Pow(ClampedT, FMath::Clamp(CastNetBellExponent, 0.2f, 1.5f));
+	const float OpenProgress = FMath::Lerp(0.58f, 1.0f, FMath::Pow(FMath::Clamp(CurrentReachAlpha, 0.0f, 1.0f), 0.45f));
+	return FMath::Lerp(StartR, MaxR, BellCurve) * OpenProgress;
+}
+
+UProceduralMeshComponent* UNetTendrilAbility::EnsureCastNetMeshComponent()
+{
+	if (CastNetMesh.IsValid())
+	{
+		return CastNetMesh.Get();
+	}
+
+	ISpaceTendrilHostInterface* HostIfc = Host.GetInterface();
+	AActor* HostActor = HostIfc ? HostIfc->GetTendrilHostActor() : nullptr;
+	if (!HostActor)
+	{
+		return nullptr;
+	}
+
+	UProceduralMeshComponent* NewNetMesh = NewObject<UProceduralMeshComponent>(HostActor, NAME_None, RF_Transient);
+	if (!NewNetMesh)
+	{
+		return nullptr;
+	}
+
+	NewNetMesh->SetUsingAbsoluteLocation(true);
+	NewNetMesh->SetUsingAbsoluteRotation(true);
+	NewNetMesh->SetUsingAbsoluteScale(true);
+	NewNetMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	NewNetMesh->SetGenerateOverlapEvents(false);
+	NewNetMesh->SetCastShadow(false);
+	NewNetMesh->bUseAsyncCooking = false;
+
+	if (!CachedCastNetMaterial.IsValid())
+	{
+		UMaterialInterface* LoadedMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Sandbox/MiniProject/Materials/M_MyceliumRibbon.M_MyceliumRibbon"));
+		if (!LoadedMat)
+		{
+			LoadedMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Sandbox/MiniProject/Materials/M_SpaceMineral.M_SpaceMineral"));
+		}
+		if (!LoadedMat)
+		{
+			LoadedMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		}
+		CachedCastNetMaterial = LoadedMat;
+	}
+
+	if (UMaterialInterface* Mat = CachedCastNetMaterial.Get())
+	{
+		NewNetMesh->SetMaterial(0, Mat);
+	}
+
+	NewNetMesh->RegisterComponent();
+	NewNetMesh->SetVisibility(false);
+	CastNetMesh = NewNetMesh;
+	return NewNetMesh;
+}
+
+void UNetTendrilAbility::HideCastNetMesh()
+{
+	if (UProceduralMeshComponent* NetMesh = CastNetMesh.Get())
+	{
+		NetMesh->ClearAllMeshSections();
+		NetMesh->SetVisibility(false);
+	}
+}
+
+void UNetTendrilAbility::UpdateCastNetMesh(const FVector& StartPos, float CurrentReachAlpha, float TimeSec)
+{
+	ISpaceTendrilHostInterface* HostIfc = Host.GetInterface();
+	if (!HostIfc || CurrentReachAlpha <= KINDA_SMALL_NUMBER)
+	{
+		HideCastNetMesh();
+		return;
+	}
+
+	UProceduralMeshComponent* NetMesh = EnsureCastNetMeshComponent();
+	if (!NetMesh)
+	{
+		return;
+	}
+
+	const float BodyRadius = FMath::Max(HostIfc->GetTendrilBodyRadius(), 20.0f);
+	const float CurrentNetLen = FMath::Max(GetEffectiveReachCm() * CurrentReachAlpha, BodyRadius * 1.2f);
+	const float StrandHalfWidth = FMath::Max(BodyRadius * FMath::Clamp(NetStrandThicknessBodyRadiusRatio, 0.01f, 0.2f), 2.5f);
+	const int32 RadialCount = FMath::Clamp(NetRadialStrandCount, 6, 24);
+	const int32 RingCount = FMath::Clamp(NetConcentricRingCount, 3, 14);
+	const float FadeAlpha = FMath::SmoothStep(0.0f, 0.12f, ExtendAlpha);
+
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TArray<FVector> Normals;
+	TArray<FVector2D> UVs;
+	TArray<FLinearColor> Colors;
+	TArray<FProcMeshTangent> Tangents;
+
+	const int32 EstimatedQuads = RadialCount * RingCount * 3 + SlowedEnemiesThisShot.Num() * 48;
+	Vertices.Reserve(EstimatedQuads * 4);
+	Triangles.Reserve(EstimatedQuads * 12);
+	Normals.Reserve(EstimatedQuads * 4);
+	UVs.Reserve(EstimatedQuads * 4);
+	Colors.Reserve(EstimatedQuads * 4);
+
+	auto AppendRibbonSegment = [&](const FVector& P0, const FVector& P1, const FVector& SideAxis, float HalfW, const FLinearColor& C0, const FLinearColor& C1)
+	{
+		const FVector SegDir = (P1 - P0).GetSafeNormal();
+		if (SegDir.IsNearlyZero())
+		{
+			return;
+		}
+		FVector Side = FVector::CrossProduct(SegDir, SideAxis).GetSafeNormal();
+		if (Side.IsNearlyZero())
+		{
+			Side = FVector::CrossProduct(SegDir, LockedAimUp).GetSafeNormal();
+		}
+		if (Side.IsNearlyZero())
+		{
+			Side = FVector::CrossProduct(SegDir, LockedAimRight).GetSafeNormal();
+		}
+		const FVector Nrm = FVector::CrossProduct(Side, SegDir).GetSafeNormal();
+		const int32 BaseIdx = Vertices.Num();
+
+		Vertices.Add(P0 - Side * HalfW);
+		Vertices.Add(P0 + Side * HalfW);
+		Vertices.Add(P1 + Side * HalfW);
+		Vertices.Add(P1 - Side * HalfW);
+
+		Normals.Add(Nrm);
+		Normals.Add(Nrm);
+		Normals.Add(Nrm);
+		Normals.Add(Nrm);
+
+		UVs.Add(FVector2D(0.0f, 0.0f));
+		UVs.Add(FVector2D(1.0f, 0.0f));
+		UVs.Add(FVector2D(1.0f, 1.0f));
+		UVs.Add(FVector2D(0.0f, 1.0f));
+
+		Colors.Add(C0);
+		Colors.Add(C0);
+		Colors.Add(C1);
+		Colors.Add(C1);
+
+		// 양면 렌더링 (앞/뒤 어느 각도에서도 투망이 선명하게 보이도록)
+		Triangles.Add(BaseIdx + 0); Triangles.Add(BaseIdx + 1); Triangles.Add(BaseIdx + 2);
+		Triangles.Add(BaseIdx + 0); Triangles.Add(BaseIdx + 2); Triangles.Add(BaseIdx + 3);
+		Triangles.Add(BaseIdx + 0); Triangles.Add(BaseIdx + 2); Triangles.Add(BaseIdx + 1);
+		Triangles.Add(BaseIdx + 0); Triangles.Add(BaseIdx + 3); Triangles.Add(BaseIdx + 2);
+	};
+
+	// 격자 노드 미리 계산: [RingIdx][RadialIdx]
+	TArray<TArray<FVector>> NetNodes;
+	NetNodes.SetNum(RingCount + 1);
+	for (int32 r = 0; r <= RingCount; ++r)
+	{
+		const float T = static_cast<float>(r) / static_cast<float>(RingCount);
+		const float BaseRadius = EvaluateFunnelRadiusCm(T, CurrentReachAlpha);
+		// 투망 끝단(Rim)이 낚시 그물처럼 앞쪽으로 살짝 말리며 감싸는 형태
+		const float RimCupForward = FMath::Sin(T * UE_PI * 0.85f) * BodyRadius * 0.25f;
+		const FVector RingCenter = EvaluateFunnelCenter(StartPos, CurrentNetLen, T, TimeSec) + LockedAimDir * RimCupForward;
+
+		NetNodes[r].SetNum(RadialCount);
+		for (int32 a = 0; a < RadialCount; ++a)
+		{
+			const float Angle = (2.0f * UE_PI * static_cast<float>(a)) / static_cast<float>(RadialCount);
+			// 무중력 공간에서 투망이 일렁이는 미세 파동
+			const float Billow = 1.0f + 0.055f * FMath::Sin(TimeSec * 5.2f + Angle * 3.0f - T * 4.5f) * T;
+			const FVector RadialDir = LockedAimRight * FMath::Cos(Angle) + LockedAimUp * FMath::Sin(Angle);
+			NetNodes[r][a] = RingCenter + RadialDir * (BaseRadius * Billow);
+		}
+	}
+
+	const FLinearColor InnerColor(0.18f, 0.96f, 0.88f, FadeAlpha);
+	const FLinearColor OuterRimColor(0.45f, 0.92f, 1.0f, FadeAlpha);
+	const FLinearColor WebCrossColor(0.28f, 0.84f, 0.98f, FadeAlpha * 0.92f);
+
+	// 1) 방사형 주 가닥 (Radial Strands)
+	for (int32 a = 0; a < RadialCount; ++a)
+	{
+		const float Angle = (2.0f * UE_PI * static_cast<float>(a)) / static_cast<float>(RadialCount);
+		const FVector Outward = LockedAimRight * FMath::Cos(Angle) + LockedAimUp * FMath::Sin(Angle);
+		for (int32 r = 0; r < RingCount; ++r)
+		{
+			const float T0 = static_cast<float>(r) / static_cast<float>(RingCount);
+			const float T1 = static_cast<float>(r + 1) / static_cast<float>(RingCount);
+			const FLinearColor C0 = FMath::Lerp(InnerColor, OuterRimColor, T0);
+			const FLinearColor C1 = FMath::Lerp(InnerColor, OuterRimColor, T1);
+			AppendRibbonSegment(NetNodes[r][a], NetNodes[r + 1][a], Outward, StrandHalfWidth * 1.15f, C0, C1);
+		}
+	}
+
+	// 2) 동심원 가로 그물 링 (Concentric Hoops) + 다이아몬드 교차 그물코
+	for (int32 r = 1; r <= RingCount; ++r)
+	{
+		const float T = static_cast<float>(r) / static_cast<float>(RingCount);
+		const bool bIsOuterRim = (r == RingCount);
+		const float HoopHalfW = bIsOuterRim ? (StrandHalfWidth * 1.45f) : (StrandHalfWidth * 0.85f);
+		const FLinearColor RingCol = bIsOuterRim ? OuterRimColor : FMath::Lerp(InnerColor, OuterRimColor, T);
+
+		for (int32 a = 0; a < RadialCount; ++a)
+		{
+			const int32 NextA = (a + 1) % RadialCount;
+			AppendRibbonSegment(NetNodes[r][a], NetNodes[r][NextA], LockedAimDir, HoopHalfW, RingCol, RingCol);
+
+			// 엇갈린 대각선 그물코(교차 그물 느낌 강화)
+			if (r < RingCount && ((r + a) % 2 == 0))
+			{
+				AppendRibbonSegment(NetNodes[r][a], NetNodes[r + 1][NextA], LockedAimDir, StrandHalfWidth * 0.65f, WebCrossColor, WebCrossColor);
+			}
+		}
+	}
+
+	// 3) 포획망에 걸린 포식자 주변을 감싸는 청록색 속박 그물 케이지 연출
+	const FLinearColor SnareColor(0.42f, 1.0f, 0.96f, FadeAlpha);
+	for (const TWeakObjectPtr<ASpaceEnemyMold>& WeakEnemy : SlowedEnemiesThisShot)
+	{
+		const ASpaceEnemyMold* Enemy = WeakEnemy.Get();
+		if (!IsValid(Enemy) || Enemy->IsDormant())
+		{
+			continue;
+		}
+		const FVector EnemyCenter = Enemy->GetActorLocation();
+		const float SnareR = Enemy->GetCurrentRadiusCm() * 1.14f;
+		const float SnareW = FMath::Max(SnareR * 0.055f, 3.0f);
+		constexpr int32 CageSegs = 12;
+
+		// 3개의 직교 경사 그물 링으로 포식자가 그물에 감긴 시각적 피드백 강화
+		const FVector Axes[3][2] = {
+			{ FVector::ForwardVector, FVector::RightVector },
+			{ FVector::RightVector, FVector::UpVector },
+			{ FVector::UpVector, FVector::ForwardVector }
+		};
+		for (int32 RingIdx = 0; RingIdx < 3; ++RingIdx)
+		{
+			const float Spin = TimeSec * (RingIdx == 0 ? 1.8f : -1.4f) + static_cast<float>(RingIdx);
+			const FVector UAxis = Axes[RingIdx][0];
+			const FVector VAxis = Axes[RingIdx][1];
+			const FVector RingNormal = FVector::CrossProduct(UAxis, VAxis).GetSafeNormal();
+			for (int32 s = 0; s < CageSegs; ++s)
+			{
+				const float A0 = Spin + (2.0f * UE_PI * static_cast<float>(s)) / static_cast<float>(CageSegs);
+				const float A1 = Spin + (2.0f * UE_PI * static_cast<float>(s + 1)) / static_cast<float>(CageSegs);
+				const FVector P0 = EnemyCenter + (UAxis * FMath::Cos(A0) + VAxis * FMath::Sin(A0)) * SnareR;
+				const FVector P1 = EnemyCenter + (UAxis * FMath::Cos(A1) + VAxis * FMath::Sin(A1)) * SnareR;
+				AppendRibbonSegment(P0, P1, RingNormal, SnareW, SnareColor, SnareColor);
+			}
+		}
+	}
+
+	NetMesh->SetVisibility(true);
+	NetMesh->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
 }
 
 // [V3: UJetTendrilAbility — 단발 긴급 탈출 분사]

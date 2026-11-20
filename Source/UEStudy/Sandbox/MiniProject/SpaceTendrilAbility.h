@@ -12,6 +12,8 @@ class AActor;
 class UPrimitiveComponent;
 class UStaticMeshComponent;
 class UFXSystemComponent;
+class UMaterialInterface;
+class UProceduralMeshComponent;
 class ASpaceMineral;
 class ASpaceEnemyMold;
 class AEnemyMoldManager;
@@ -426,6 +428,36 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|Slow", meta = (ClampMin = "0.25", ClampMax = "0.95"))
 	float WebMinShrinkRadiusRatio = 0.50f;
 
+	/** 곰팡이 현재 반지름 대비 투망(V2) 최대 비거리 배율입니다(짧은 비거리로 넓게 뿌리는 낚시 그물 형태). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "2.5", ClampMax = "20.0"))
+	float NetReachBodyRadiusMultiplier = 7.2f;
+
+	/** 곰팡이 현재 반지름 대비 투망 발사 직후(시작점) 펼쳐짐 반경 배율입니다(시작부터 넓게 진행). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.5", ClampMax = "6.0"))
+	float NetStartSpreadBodyRadiusMultiplier = 1.65f;
+
+	/** 곰팡이 현재 반지름 대비 투망 끝단 최대 펼쳐짐 반경 배율입니다(넓게 퍼지는 포획망). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "2.0", ClampMax = "12.0"))
+	float NetMaxSpreadBodyRadiusMultiplier = 5.5f;
+
+	/** 투망 펼쳐짐 곡선 지수입니다(1.0 미만일수록 시작 구간부터 낙하산·투망처럼 확 넓게 펼쳐집니다). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.2", ClampMax = "1.5"))
+	float CastNetBellExponent = 0.50f;
+
+	/** 곰팡이 현재 반지름 대비 투망 그물 가닥의 굵기 비율입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "0.01", ClampMax = "0.2"))
+	float NetStrandThicknessBodyRadiusRatio = 0.045f;
+
+	/** 투망을 구성하는 방사형 주 가닥 수입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "6", ClampMax = "24"))
+	int32 NetRadialStrandCount = 12;
+
+	/** 투망을 가로로 엮는 동심원 그물 링 수입니다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NetTendril|CastNet", meta = (ClampMin = "3", ClampMax = "14"))
+	int32 NetConcentricRingCount = 6;
+
+	virtual void DeactivateAbilityImmediate() override;
+
 protected:
 	virtual void LatchCameraAimBasis() override;
 	virtual void OnAbilityActivated() override;
@@ -437,9 +469,14 @@ protected:
 private:
 	FVector EvaluateFunnelCenter(const FVector& StartPos, float MaxNetLenCm, float NormalizedT, float TimeSec) const;
 	float EvaluateFunnelRadiusCm(float NormalizedT, float CurrentReachAlpha) const;
+	UProceduralMeshComponent* EnsureCastNetMeshComponent();
+	void UpdateCastNetMesh(const FVector& StartPos, float CurrentReachAlpha, float TimeSec);
+	void HideCastNetMesh();
 
 	TWeakObjectPtr<AEnemyMoldManager> CachedEnemyManager;
 	TSet<TWeakObjectPtr<ASpaceEnemyMold>> SlowedEnemiesThisShot;
+	TWeakObjectPtr<UProceduralMeshComponent> CastNetMesh;
+	TWeakObjectPtr<UMaterialInterface> CachedCastNetMaterial;
 };
 
 /**

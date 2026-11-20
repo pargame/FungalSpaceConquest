@@ -28,14 +28,6 @@ void USpaceDrifterHUDWidget::BindToPawnAndController(ASpaceDrifterPawn* InPawn, 
 {
 	OwnerPawn = InPawn;
 	OwnerPC = InPC;
-	if (NameInputTextBox.IsValid() && InPC)
-	{
-		const FString SavedName = InPC->GetCurrentPlayerName();
-		if (SavedName != TEXT("익명 곰팡이"))
-		{
-			NameInputTextBox->SetText(FText::FromString(SavedName));
-		}
-	}
 	RefreshLeaderboardDisplay();
 	RefreshPauseMenuSettingsDisplay();
 	RefreshHUDTexts();
@@ -377,7 +369,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 						.AutoHeight()
 						.Padding(0.0f, 0.0f, 0.0f, 16.0f)
 						[
-							SNew(SBorder)
+							SAssignNew(NameInputFrameBorder, SBorder)
 							.BorderImage(WhiteBrush)
 							.BorderBackgroundColor(FLinearColor(0.05f, 0.10f, 0.16f, 0.92f))
 							.Padding(FMargin(16.0f, 12.0f))
@@ -400,7 +392,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 										SAssignNew(NameConfirmHintTextBlock, STextBlock)
 										.Font(MicroHeaderFont)
 										.ColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.85f, 0.95f, 0.85f)))
-										.Text(FText::FromString(TEXT("이름 입력 후 스페이스바 즉시 시작 (공백 불가)")))
+										.Text(FText::FromString(TEXT("이름 입력 후 스페이스바로 바로 시작!")))
 									]
 								]
 								+ SVerticalBox::Slot()
@@ -409,7 +401,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 									SAssignNew(NameInputTextBox, SEditableTextBox)
 									.Font(HUDStatFont)
 									.Justification(ETextJustify::Center)
-									.HintText(FText::FromString(TEXT("이름 입력 (비워두면 '익명 곰팡이')")))
+									.HintText(FText::FromString(TEXT("플레이어 이름 입력 (필수)")))
 									.OnTextChanged(FOnTextChanged::CreateUObject(this, &USpaceDrifterHUDWidget::OnNameTextChanged))
 									.OnTextCommitted(FOnTextCommitted::CreateUObject(this, &USpaceDrifterHUDWidget::OnNameTextCommitted))
 								]
@@ -1254,7 +1246,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::RebuildWidget()
 							SAssignNew(UnlockPopupTitleTextBlock, STextBlock)
 							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 24))
 							.ColorAndOpacity(FSlateColor(FLinearColor(0.98f, 1.0f, 1.0f, 1.0f)))
-							.Text(FText::FromString(TEXT("[2] V2 그물 촉수 해금!")))
+							.Text(FText::FromString(TEXT("2번 키 · V2 그물 촉수 해금!")))
 						]
 						+ SVerticalBox::Slot()
 						.AutoHeight()
@@ -1698,7 +1690,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::BuildTendrilSlotBox(
 	const FSlateBrush* WhiteBrush = FCoreStyle::Get().GetBrush("WhiteBrush");
 
 	return SNew(SBox)
-		.WidthOverride(152.0f)
+		.WidthOverride(172.0f)
 		[
 			SAssignNew(SlotBorders[SlotIndex], SBorder)
 			.BorderImage(WhiteBrush)
@@ -1733,7 +1725,7 @@ TSharedRef<SWidget> USpaceDrifterHUDWidget::BuildTendrilSlotBox(
 							SAssignNew(SlotKeyTexts[SlotIndex], STextBlock)
 							.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
 							.ColorAndOpacity(FSlateColor(FLinearColor(0.45f, 0.96f, 0.80f, 1.0f)))
-							.Text(FText::FromString(FString::Printf(TEXT("[%s]"), *KeyLabel)))
+							.Text(FText::FromString(FString::Printf(TEXT("%s번 키"), *KeyLabel)))
 						]
 						+ SHorizontalBox::Slot()
 						.FillWidth(1.0f)
@@ -1764,6 +1756,7 @@ void USpaceDrifterHUDWidget::ReleaseSlateResources(bool bReleaseChildren)
 
 	RootDPIScaler.Reset();
 
+	NameInputFrameBorder.Reset();
 	NameInputTextBox.Reset();
 	NameConfirmHintTextBlock.Reset();
 	TitleLeaderboardListBox.Reset();
@@ -1895,15 +1888,15 @@ void USpaceDrifterHUDWidget::TriggerAbilityUnlockEffect(ETendrilVisualStyle Unlo
 	if (UnlockPopupTitleTextBlock.IsValid())
 	{
 		UnlockPopupTitleTextBlock->SetText(FText::FromString(
-			bIsV3 ? TEXT("[3] V3 긴급 탈출 분사 해금!") : TEXT("[2] V2 그물 촉수 해금!")
+			bIsV3 ? TEXT("3번 키 · V3 긴급 탈출 분사 해금!") : TEXT("2번 키 · V2 그물 촉수 해금!")
 		));
 	}
 	if (UnlockPopupDescTextBlock.IsValid())
 	{
 		UnlockPopupDescTextBlock->SetText(FText::FromString(
 			bIsV3
-				? TEXT("전방 고속 임펄스 긴급 탈출 (쿨타임 6초)  |  [3] 키로 전환")
-				: TEXT("광역 포식자 둔화 · 크기 -15% 영구 축소  |  [2] 키로 전환")
+				? TEXT("전방 고속 임펄스 긴급 탈출 (쿨타임 6초)  |  3번 키로 전환")
+				: TEXT("광역 포식자 둔화 · 크기 -15% 영구 축소  |  2번 키로 전환")
 		));
 	}
 }
@@ -2181,7 +2174,8 @@ void USpaceDrifterHUDWidget::RefreshEnemyIndicator(const FGeometry& MyGeometry)
 	}
 
 	const FVector2D RawLocalSize = MyGeometry.GetLocalSize();
-	const FVector2D LocalSize = (CurrentUIScale > KINDA_SMALL_NUMBER) ? (RawLocalSize / CurrentUIScale) : RawLocalSize;
+	const float EffectiveDPIScale = GetCurrentUIScale();
+	const FVector2D LocalSize = (EffectiveDPIScale > KINDA_SMALL_NUMBER) ? (RawLocalSize / EffectiveDPIScale) : RawLocalSize;
 	if (LocalSize.X <= 1.0f || LocalSize.Y <= 1.0f)
 	{
 		HideAllMarkers();
@@ -2285,10 +2279,66 @@ void USpaceDrifterHUDWidget::RefreshEnemyIndicator(const FGeometry& MyGeometry)
 	}
 }
 
+void USpaceDrifterHUDWidget::TriggerEmptyNameWarning()
+{
+	EmptyNameWarningTimer = 2.0f;
+
+	if (NameConfirmHintTextBlock.IsValid())
+	{
+		NameConfirmHintTextBlock->SetText(FText::FromString(TEXT("⚠ 이름을 입력해야 시작할 수 있습니다!")));
+		NameConfirmHintTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.36f, 0.32f, 1.0f)));
+	}
+	if (NameInputFrameBorder.IsValid())
+	{
+		NameInputFrameBorder->SetBorderBackgroundColor(FLinearColor(0.42f, 0.08f, 0.10f, 0.96f));
+	}
+	if (NameInputTextBox.IsValid() && FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().SetKeyboardFocus(NameInputTextBox.ToSharedRef(), EFocusCause::SetDirectly);
+	}
+}
+
 void USpaceDrifterHUDWidget::RefreshTitlePulse(float InDeltaTime)
 {
 	TitlePulseTime += InDeltaTime;
 	const float Pulse = 0.5f + 0.5f * FMath::Sin(TitlePulseTime * 3.2f);
+
+	if (EmptyNameWarningTimer > 0.0f)
+	{
+		EmptyNameWarningTimer = FMath::Max(EmptyNameWarningTimer - InDeltaTime, 0.0f);
+		const float WarnPulse = 0.5f + 0.5f * FMath::Sin(TitlePulseTime * 18.0f);
+		if (EmptyNameWarningTimer > KINDA_SMALL_NUMBER)
+		{
+			if (NameInputFrameBorder.IsValid())
+			{
+				NameInputFrameBorder->SetBorderBackgroundColor(FLinearColor(
+					FMath::Lerp(0.24f, 0.48f, WarnPulse),
+					FMath::Lerp(0.06f, 0.11f, WarnPulse),
+					FMath::Lerp(0.08f, 0.13f, WarnPulse),
+					0.96f));
+			}
+			if (NameConfirmHintTextBlock.IsValid())
+			{
+				NameConfirmHintTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(
+					1.0f,
+					FMath::Lerp(0.30f, 0.58f, WarnPulse),
+					FMath::Lerp(0.26f, 0.42f, WarnPulse),
+					1.0f)));
+			}
+		}
+		else
+		{
+			if (NameInputFrameBorder.IsValid())
+			{
+				NameInputFrameBorder->SetBorderBackgroundColor(FLinearColor(0.05f, 0.10f, 0.16f, 0.92f));
+			}
+			if (NameConfirmHintTextBlock.IsValid())
+			{
+				NameConfirmHintTextBlock->SetText(FText::FromString(TEXT("이름 입력 후 스페이스바로 바로 시작!")));
+				NameConfirmHintTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.85f, 0.95f, 0.85f)));
+			}
+		}
+	}
 
 	if (TitleKeycapOuterBorder.IsValid())
 	{
@@ -2892,8 +2942,26 @@ FReply USpaceDrifterHUDWidget::OnPauseQuitClicked()
 	return FReply::Handled();
 }
 
+FString USpaceDrifterHUDWidget::GetSanitizedNameInputText() const
+{
+	if (!NameInputTextBox.IsValid())
+	{
+		return FString();
+	}
+	FString Sanitized = NameInputTextBox->GetText().ToString();
+	Sanitized.ReplaceInline(TEXT(" "), TEXT(""));
+	Sanitized.ReplaceInline(TEXT("\t"), TEXT(""));
+	return Sanitized.TrimStartAndEnd().Left(12);
+}
+
 void USpaceDrifterHUDWidget::OnNameTextChanged(const FText& NewText)
 {
+	ASpaceDrifterPlayerController* PC = OwnerPC.Get();
+	if (!PC || !PC->IsInTitleScreen())
+	{
+		return;
+	}
+
 	const FString Raw = NewText.ToString();
 	const bool bHasSpace = Raw.Contains(TEXT(" "));
 
@@ -2906,10 +2974,28 @@ void USpaceDrifterHUDWidget::OnNameTextChanged(const FText& NewText)
 		NameInputTextBox->SetText(FText::FromString(Sanitized));
 	}
 
-	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
+	if (!Sanitized.IsEmpty() && EmptyNameWarningTimer > 0.0f)
 	{
-		PC->SetCurrentPlayerName(Sanitized, bHasSpace);
-		if (bHasSpace && PC->IsInTitleScreen())
+		EmptyNameWarningTimer = 0.0f;
+		if (NameInputFrameBorder.IsValid())
+		{
+			NameInputFrameBorder->SetBorderBackgroundColor(FLinearColor(0.05f, 0.10f, 0.16f, 0.92f));
+		}
+		if (NameConfirmHintTextBlock.IsValid())
+		{
+			NameConfirmHintTextBlock->SetText(FText::FromString(TEXT("이름 입력 후 스페이스바로 바로 시작!")));
+			NameConfirmHintTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.85f, 0.95f, 0.85f)));
+		}
+	}
+
+	PC->SetCurrentPlayerName(Sanitized, false);
+	if (bHasSpace)
+	{
+		if (Sanitized.IsEmpty())
+		{
+			TriggerEmptyNameWarning();
+		}
+		else
 		{
 			PC->StartGameplayFromTitle();
 		}
@@ -2918,13 +3004,21 @@ void USpaceDrifterHUDWidget::OnNameTextChanged(const FText& NewText)
 
 void USpaceDrifterHUDWidget::OnNameTextCommitted(const FText& NewText, ETextCommit::Type CommitType)
 {
+	ASpaceDrifterPlayerController* PC = OwnerPC.Get();
+	// 이미 게임이 시작된 뒤 포커스 이탈(OnUserMovedFocus)로 호출되는 커밋이 플레이어 이름을 덮어쓰지 않도록 차단
+	if (!PC || !PC->IsInTitleScreen())
+	{
+		return;
+	}
+
 	FString Sanitized = NewText.ToString();
 	Sanitized.ReplaceInline(TEXT(" "), TEXT(""));
 	Sanitized.ReplaceInline(TEXT("\t"), TEXT(""));
+	Sanitized = Sanitized.TrimStartAndEnd().Left(12);
 
-	if (ASpaceDrifterPlayerController* PC = OwnerPC.Get())
+	if (!Sanitized.IsEmpty())
 	{
-		PC->SetCurrentPlayerName(Sanitized, true);
+		PC->SetCurrentPlayerName(Sanitized, false);
 	}
 }
 
@@ -2973,10 +3067,42 @@ void USpaceDrifterHUDWidget::PopulateLeaderboardBox(const TSharedPtr<SVerticalBo
 	}
 
 	const FSlateBrush* WhiteBrush = FCoreStyle::Get().GetBrush("WhiteBrush");
+
+	// 동명이인 시간순 넘버링 산출 (등록 순서 RegistrationOrder 오름차순 기준: 1차, 2차, 3차...)
+	TMap<FString, TArray<int32>> NameToEntryIndices;
+	for (int32 i = 0; i < SaveObj->Entries.Num(); ++i)
+	{
+		NameToEntryIndices.FindOrAdd(SaveObj->Entries[i].PlayerName).Add(i);
+	}
+	TArray<int32> DuplicateChronoNumber;
+	DuplicateChronoNumber.Init(0, SaveObj->Entries.Num());
+	for (TPair<FString, TArray<int32>>& Pair : NameToEntryIndices)
+	{
+		if (Pair.Value.Num() <= 1)
+		{
+			continue;
+		}
+		Pair.Value.Sort([SaveObj](int32 IndexA, int32 IndexB)
+		{
+			const int32 OrderA = SaveObj->Entries[IndexA].RegistrationOrder;
+			const int32 OrderB = SaveObj->Entries[IndexB].RegistrationOrder;
+			if (OrderA != OrderB)
+			{
+				return OrderA < OrderB;
+			}
+			return IndexA < IndexB;
+		});
+		for (int32 Seq = 0; Seq < Pair.Value.Num(); ++Seq)
+		{
+			DuplicateChronoNumber[Pair.Value[Seq]] = Seq + 1;
+		}
+	}
+
 	const int32 ShowCount = FMath::Min(SaveObj->Entries.Num(), 5);
 	for (int32 Idx = 0; Idx < ShowCount; ++Idx)
 	{
 		const FSpaceLeaderboardEntry& Entry = SaveObj->Entries[Idx];
+		const int32 ChronoNum = DuplicateChronoNumber.IsValidIndex(Idx) ? DuplicateChronoNumber[Idx] : 0;
 		const FLinearColor RankColor = (Idx == 0)
 			? FLinearColor(1.0f, 0.84f, 0.28f, 1.0f)
 			: (Idx == 1
@@ -2984,6 +3110,38 @@ void USpaceDrifterHUDWidget::PopulateLeaderboardBox(const TSharedPtr<SVerticalBo
 				: (Idx == 2
 					? FLinearColor(0.92f, 0.62f, 0.36f, 1.0f)
 					: FLinearColor(0.65f, 0.76f, 0.88f, 0.92f)));
+
+		TSharedRef<SHorizontalBox> NameRow = SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock)
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+				.ColorAndOpacity(FSlateColor(FLinearColor(0.94f, 0.98f, 1.0f, 1.0f)))
+				.Text(FText::FromString(Entry.PlayerName))
+			];
+
+		// 동명이인일 때만 이름과 명확히 분리된 보조 배지(등록 시간순 번호)를 우측에 표시
+		if (ChronoNum > 0)
+		{
+			NameRow->AddSlot()
+				.AutoWidth()
+				.VAlign(VAlign_Center)
+				.Padding(6.0f, 0.0f, 0.0f, 0.0f)
+				[
+					SNew(SBorder)
+					.BorderImage(WhiteBrush)
+					.BorderBackgroundColor(FLinearColor(0.12f, 0.26f, 0.38f, 0.92f))
+					.Padding(FMargin(5.0f, 1.0f))
+					[
+						SNew(STextBlock)
+						.Font(FCoreStyle::GetDefaultFontStyle("Regular", 9))
+						.ColorAndOpacity(FSlateColor(FLinearColor(0.58f, 0.88f, 1.0f, 0.96f)))
+						.Text(FText::FromString(FString::Printf(TEXT("%d차"), ChronoNum)))
+					]
+				];
+		}
 
 		TargetBox->AddSlot()
 			.AutoHeight()
@@ -3009,10 +3167,7 @@ void USpaceDrifterHUDWidget::PopulateLeaderboardBox(const TSharedPtr<SVerticalBo
 					.FillWidth(1.0f)
 					.VAlign(VAlign_Center)
 					[
-						SNew(STextBlock)
-						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
-						.ColorAndOpacity(FSlateColor(FLinearColor(0.94f, 0.98f, 1.0f, 1.0f)))
-						.Text(FText::FromString(Entry.PlayerName))
+						NameRow
 					]
 					+ SHorizontalBox::Slot()
 					.AutoWidth()

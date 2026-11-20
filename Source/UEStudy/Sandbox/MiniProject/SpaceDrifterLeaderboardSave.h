@@ -34,6 +34,10 @@ struct FSpaceLeaderboardEntry
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	float ClearTimeSeconds = 0.0f;
 
+	/** 동명이인 시간순 구분을 위한 등록 순서 번호입니다(등록 시점 순으로 1씩 증가). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
+	int32 RegistrationOrder = 0;
+
 	// 레거시 SaveGame 호환용 필드
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	bool bSurvivedFullTime = false;
@@ -56,6 +60,10 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Leaderboard")
 	FString LastPlayerName;
+
+	/** 다음 리더보드 등록 시 부여할 단조 증가 시간순 번호입니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Leaderboard")
+	int32 NextRegistrationOrder = 1;
 
 	static USpaceDrifterLeaderboardSave* LoadOrCreate()
 	{
@@ -99,13 +107,22 @@ public:
 
 	void AddScoreAndSave(const FSpaceLeaderboardEntry& NewEntry)
 	{
-		Entries.Add(NewEntry);
+		FSpaceLeaderboardEntry EntryToAdd = NewEntry;
+		int32 MaxExistingOrder = 0;
+		for (const FSpaceLeaderboardEntry& Existing : Entries)
+		{
+			MaxExistingOrder = FMath::Max(MaxExistingOrder, Existing.RegistrationOrder);
+		}
+		const int32 AssignedOrder = FMath::Max(NextRegistrationOrder, MaxExistingOrder + 1);
+		EntryToAdd.RegistrationOrder = AssignedOrder;
+		NextRegistrationOrder = AssignedOrder + 1;
+
+		Entries.Add(EntryToAdd);
 		SortEntries();
 		if (Entries.Num() > 20)
 		{
 			Entries.SetNum(20);
 		}
-		LastPlayerName = NewEntry.PlayerName;
 		UGameplayStatics::SaveGameToSlot(this, SaveSlotName, SaveUserIndex);
 	}
 
@@ -118,6 +135,7 @@ public:
 	void ClearAllAndSave()
 	{
 		Entries.Reset();
+		NextRegistrationOrder = 1;
 		UGameplayStatics::SaveGameToSlot(this, SaveSlotName, SaveUserIndex);
 	}
 };

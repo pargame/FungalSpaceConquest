@@ -17,10 +17,8 @@ void ASpaceDrifterPlayerController::BeginPlay()
 
 	if (IsLocalPlayerController())
 	{
-		if (const USpaceDrifterLeaderboardSave* SaveObj = USpaceDrifterLeaderboardSave::LoadOrCreate())
-		{
-			CurrentPlayerName = SaveObj->LastPlayerName;
-		}
+		// 매 시작/재시작마다 이전 이름을 불러오지 않고 항상 빈칸으로 초기화
+		CurrentPlayerName.Empty();
 
 		EnsureHUDCreated();
 
@@ -94,13 +92,12 @@ void ASpaceDrifterPlayerController::SetCurrentPlayerName(const FString& InName, 
 	Sanitized.ReplaceInline(TEXT(" "), TEXT(""));
 	Sanitized.ReplaceInline(TEXT("\t"), TEXT(""));
 	CurrentPlayerName = Sanitized.TrimStartAndEnd().Left(12);
-	if (bSaveToDisk)
-	{
-		if (USpaceDrifterLeaderboardSave* SaveObj = USpaceDrifterLeaderboardSave::LoadOrCreate())
-		{
-			SaveObj->SaveLastPlayerName(CurrentPlayerName);
-		}
-	}
+	(void)bSaveToDisk;
+}
+
+bool ASpaceDrifterPlayerController::HasValidPlayerName() const
+{
+	return !CurrentPlayerName.TrimStartAndEnd().IsEmpty();
 }
 
 FString ASpaceDrifterPlayerController::GetCurrentPlayerName() const
@@ -221,22 +218,91 @@ void ASpaceDrifterPlayerController::QuitGameFromPauseMenu()
 	UKismetSystemLibrary::QuitGame(this, this, EQuitPreference::Quit, false);
 }
 
+void ASpaceDrifterPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+
+	// 매 프레임 실제 키 상태를 검사해 스페이스바가 떼어져 있으면 차단 플래그를 즉시 해제
+	if (bSuppressTendrilUntilSpaceRelease && !IsInputKeyDown(EKeys::SpaceBar))
+	{
+		bSuppressTendrilUntilSpaceRelease = false;
+	}
+}
+
+bool ASpaceDrifterPlayerController::IsSuppressingTendrilUntilSpaceRelease() const
+{
+	if (!bSuppressTendrilUntilSpaceRelease)
+	{
+		return false;
+	}
+	if (!IsInputKeyDown(EKeys::SpaceBar))
+	{
+		const_cast<ASpaceDrifterPlayerController*>(this)->bSuppressTendrilUntilSpaceRelease = false;
+		return false;
+	}
+	return true;
+}
+
 void ASpaceDrifterPlayerController::StartGameplayFromTitle()
 {
+	EnsureHUDCreated();
+	if (HUDWidgetInstance)
+	{
+		const FString LiveInputName = HUDWidgetInstance->GetSanitizedNameInputText();
+		if (!LiveInputName.IsEmpty())
+		{
+			SetCurrentPlayerName(LiveInputName, false);
+		}
+	}
+
+	if (bStartWithTitleScreen && !HasValidPlayerName())
+	{
+		if (HUDWidgetInstance)
+		{
+			HUDWidgetInstance->TriggerEmptyNameWarning();
+		}
+		return;
+	}
+
 	bIsInTitleScreen = false;
 	bIsNameInputFocused = false;
 	bIsPauseMenuOpen = false;
-	bSuppressTendrilUntilSpaceRelease = true;
+	bSuppressTendrilUntilSpaceRelease = false;
 
 	if (IsLocalPlayerController())
 	{
+		// SEditableTextBox 및 Windows 한글 IME 포커스를 완전히 해제한 뒤 게임 뷰포트로 전환
 		if (FSlateApplication::IsInitialized())
 		{
-			FSlateApplication::Get().SetUserFocusToGameViewport(0);
+			FSlateApplication::Get().ClearKeyboardFocus(EFocusCause::SetDirectly);
 		}
+		FlushPressedKeys();
 		SetShowMouseCursor(false);
 		SetInputMode(FInputModeGameOnly());
-		EnsureHUDCreated();
+		if (FSlateApplication::IsInitialized())
+		{
+			FSlateApplication::Get().SetAllUserFocusToGameViewport(EFocusCause::SetDirectly);
+		}
+
+		// SEditableTextBox::OnTextChanged 콜백이 완전히 끝난 다음 틱에도 포커스·입력 모드를 한 번 더 확정
+		if (UWorld* World = GetWorld())
+		{
+			TWeakObjectPtr<ASpaceDrifterPlayerController> WeakThis(this);
+			World->GetTimerManager().SetTimerForNextTick([WeakThis]()
+			{
+				if (ASpaceDrifterPlayerController* StrongThis = WeakThis.Get())
+				{
+					if (!StrongThis->bIsInTitleScreen && !StrongThis->bIsPauseMenuOpen && FSlateApplication::IsInitialized())
+					{
+						FSlateApplication::Get().ClearKeyboardFocus(EFocusCause::SetDirectly);
+						StrongThis->SetShowMouseCursor(false);
+						StrongThis->SetInputMode(FInputModeGameOnly());
+						FSlateApplication::Get().SetAllUserFocusToGameViewport(EFocusCause::SetDirectly);
+					}
+				}
+			});
+		}
+
 		if (HUDWidgetInstance)
 		{
 			HUDWidgetInstance->SetStatusBannerMessage(
@@ -273,13 +339,28 @@ void ASpaceDrifterPlayerController::OnTitleConfirmKeyPressed()
 				return;
 			}
 			DrifterPawn->RestartCurrentLevel();
+			return;
 		}
+
+		// 인게임 플레이 중 스페이스바 직접 촉수 발사 보장 (EnhancedInput 누락 방지)
+		DrifterPawn->SetTendrilExtending(true);
 	}
 }
 
 void ASpaceDrifterPlayerController::OnTitleConfirmKeyReleased()
 {
 	bSuppressTendrilUntilSpaceRelease = false;
+
+	if (!bIsInTitleScreen && !bIsPauseMenuOpen)
+	{
+		if (ASpaceDrifterPawn* DrifterPawn = Cast<ASpaceDrifterPawn>(GetPawn()))
+		{
+			if (!DrifterPawn->IsRunEnded())
+			{
+				DrifterPawn->SetTendrilExtending(false);
+			}
+		}
+	}
 }
 
 void ASpaceDrifterPlayerController::OnPauseMenuKeyPressed()

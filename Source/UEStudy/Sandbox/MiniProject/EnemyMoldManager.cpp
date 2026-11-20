@@ -190,15 +190,37 @@ bool AEnemyMoldManager::TrySpawnOneEnemy(ASpaceDrifterPawn* PlayerPawn)
 	return true;
 }
 
+float AEnemyMoldManager::ComputeDynamicRespawnDelay(float BaseIntervalSeconds, int32 ActiveCount, int32 TargetMaxCount) const
+{
+	const float SafeBase = FMath::Max(BaseIntervalSeconds, 0.5f);
+	if (!bHasSpawnedFirstEnemy)
+	{
+		return SafeBase;
+	}
+
+	const float BasePct = FMath::Clamp(PostFirstSpawnIntervalPercent, 10.0f, 100.0f) * 0.01f;
+	const float SafeTarget = static_cast<float>(FMath::Max(TargetMaxCount, 1));
+	const float VacancyRatio = FMath::Clamp(static_cast<float>(TargetMaxCount - ActiveCount) / SafeTarget, 0.0f, 1.0f);
+	const float VacancyReduction = FMath::Clamp(VacancyMaxSpeedupPercent, 0.0f, 90.0f) * 0.01f * VacancyRatio;
+	const float MinRatio = FMath::Clamp(MinRespawnIntervalRatioOfBase, 0.05f, 1.0f);
+	const float EffectiveRatio = FMath::Max(BasePct * (1.0f - VacancyReduction), MinRatio);
+	return FMath::Max(SafeBase * EffectiveRatio, 0.5f);
+}
+
 void AEnemyMoldManager::NotifyEnemyDefeated(ASpaceEnemyMold* DefeatedEnemy)
 {
 	AttackTicketHolders.RemoveAll([DefeatedEnemy](const FAttackTicketEntry& Entry)
 	{
 		return !Entry.Enemy.IsValid() || Entry.Enemy.Get() == DefeatedEnemy;
 	});
-	const float NextDelay = (GetActiveEnemyCount() == 0)
-		? FMath::Max(EmptyFieldRespawnCooldownSeconds, 0.5f)
-		: DefeatRespawnCooldownSeconds;
+
+	const int32 ActiveNow = GetActiveEnemyCount();
+	const ASpaceDrifterPawn* PlayerPawn = CachedPlayerPawn.Get();
+	const int32 TargetMax = PlayerPawn ? GetCurrentTargetActiveEnemyCount(PlayerPawn) : FMath::Max(InitialMaxActiveEnemies, 1);
+	const float DynamicDelay = ComputeDynamicRespawnDelay(DefeatRespawnCooldownSeconds, ActiveNow, TargetMax);
+	const float NextDelay = (ActiveNow == 0)
+		? FMath::Min(FMath::Max(EmptyFieldRespawnCooldownSeconds, 0.5f), DynamicDelay)
+		: DynamicDelay;
 	ScheduleNextSpawn(NextDelay, true);
 }
 
@@ -385,16 +407,20 @@ void AEnemyMoldManager::Tick(float DeltaTime)
 		const int32 TargetMax = GetCurrentTargetActiveEnemyCount(PlayerPawn);
 		if (ActiveNow < TargetMax)
 		{
-			if (ActiveNow == 0 && bHasSpawnedFirstEnemy)
+			if (bHasSpawnedFirstEnemy)
 			{
-				const float FastDelay = FMath::Max(EmptyFieldRespawnCooldownSeconds, 0.5f);
+				const float DynamicDelay = ComputeDynamicRespawnDelay(ExtraEnemySpawnIntervalSeconds, ActiveNow, TargetMax);
+				const float DesiredDelay = (ActiveNow == 0)
+					? FMath::Min(FMath::Max(EmptyFieldRespawnCooldownSeconds, 0.5f), DynamicDelay)
+					: DynamicDelay;
+
 				const UWorld* CurWorld = GetWorld();
 				const float Remaining = (CurWorld && CurWorld->GetTimerManager().IsTimerActive(SpawnTimerHandle))
 					? CurWorld->GetTimerManager().GetTimerRemaining(SpawnTimerHandle)
 					: -1.0f;
-				if (Remaining < 0.0f || Remaining > FastDelay + 0.1f)
+				if (Remaining < 0.0f || Remaining > DesiredDelay + 0.1f)
 				{
-					ScheduleNextSpawn(FastDelay, true);
+					ScheduleNextSpawn(DesiredDelay, true);
 				}
 			}
 			else

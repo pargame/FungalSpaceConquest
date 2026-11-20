@@ -35,7 +35,7 @@ public:
 
 	/** 타이틀 시작용 스페이스바를 떼기 전까지 촉수 발사 관통을 차단 중인지 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "UI")
-	bool IsSuppressingTendrilUntilSpaceRelease() const { return bSuppressTendrilUntilSpaceRelease; }
+	bool IsSuppressingTendrilUntilSpaceRelease() const;
 
 	/** 타이틀 시작 화면을 닫고 게임 입력 모드로 전환합니다. */
 	UFUNCTION(BlueprintCallable, Category = "UI")
@@ -44,8 +44,12 @@ public:
 	/** 타이틀에서 입력된 플레이어 이름을 갱신합니다(bSaveToDisk=true일 때만 SaveGame에 기록). */
 	void SetCurrentPlayerName(const FString& InName, bool bSaveToDisk = false);
 
-	/** 현재 플레이어 이름을 반환합니다(비어 있으면 '익명 곰팡이'). */
+	/** 현재 플레이어 이름을 반환합니다. */
 	FString GetCurrentPlayerName() const;
+
+	/** 현재 유효한(비어 있지 않은) 플레이어 이름이 입력되었는지 반환합니다. */
+	UFUNCTION(BlueprintPure, Category = "UI")
+	bool HasValidPlayerName() const;
 
 	/** 이름 입력창 포커스 여부를 갱신합니다(입력 중 SPACE 시작 차단용). */
 	void SetNameInputFocused(bool bInFocused) { bIsNameInputFocused = bInFocused; }
@@ -86,6 +90,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
+	virtual void PlayerTick(float DeltaTime) override;
 
 private:
 	void OnTitleConfirmKeyPressed();

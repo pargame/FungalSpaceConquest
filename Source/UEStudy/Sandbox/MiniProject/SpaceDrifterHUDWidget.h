@@ -49,6 +49,12 @@ public:
 	/** 일시정지 메뉴의 UI 크기·텍스처 품질·전체 그래픽 품질 선택 상태를 최신 설정값으로 갱신합니다. */
 	void RefreshPauseMenuSettingsDisplay();
 
+	/** 타이틀 화면에서 이름이 빈칸인 상태로 시작을 시도할 때 경고 연출을 발동합니다. */
+	void TriggerEmptyNameWarning();
+
+	/** 현재 타이틀 이름 입력창에 적힌 텍스트에서 공백을 제거한 문자열을 반환합니다. */
+	FString GetSanitizedNameInputText() const;
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
@@ -61,7 +67,8 @@ private:
 	EVisibility GetPauseMenuOverlayVisibility() const;
 	EVisibility GetBannerVisibility() const;
 	EVisibility GetReticleTargetVisibility() const;
-	float GetCurrentUIScale() const { return CurrentUIScale; }
+	static constexpr float BaseUIScaleMultiplier = 1.33f;
+	float GetCurrentUIScale() const { return CurrentUIScale * BaseUIScaleMultiplier; }
 
 	void OnNameTextChanged(const FText& NewText);
 	void OnNameTextCommitted(const FText& NewText, ETextCommit::Type CommitType);
@@ -92,6 +99,7 @@ private:
 	TWeakObjectPtr<ASpaceDrifterPlayerController> OwnerPC;
 
 	// 타이틀 시작 프롬프트 & 이름 입력 & 리더보드
+	TSharedPtr<SBorder> NameInputFrameBorder;
 	TSharedPtr<SEditableTextBox> NameInputTextBox;
 	TSharedPtr<STextBlock> NameConfirmHintTextBlock;
 	TSharedPtr<SVerticalBox> TitleLeaderboardListBox;
@@ -199,6 +207,7 @@ private:
 	float SlotLockedFlashTimers[3] = { 0.0f, 0.0f, 0.0f };
 	float LockedWarningRemainingSeconds = 0.0f;
 	float LockedWarningTotalSeconds = 2.1f;
+	float EmptyNameWarningTimer = 0.0f;
 	float CurrentUIScale = 1.0f;
 	bool bPendingInitialNameFocus = true;
 	bool bReticleTargetInRange = false;

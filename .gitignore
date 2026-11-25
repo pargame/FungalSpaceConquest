@@ -25,6 +25,3 @@ Script/
 .DS_Store
 Thumbs.db
 Desktop.ini
-
-# AI agent & internal working docs (local only)
-Source/UEStudy/Sandbox/MiniProject/ARCHITECTURE.md

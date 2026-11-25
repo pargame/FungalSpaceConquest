@@ -22,3 +22,7 @@
 
 > 블루프린트/레벨 에셋의 `/Script/UEStudy` C++ 모듈 참조 호환을 위해 프로젝트 파일 및 모듈명은 `UEStudy`를 유지합니다.
 > 상세 아키텍처는 [ARCHITECTURE.md](Source/UEStudy/Sandbox/MiniProject/ARCHITECTURE.md)를 참고하세요.
+
+## 라이선스
+
+이 저장소의 코드와 직접 제작한 에셋은 [MIT License](LICENSE)를 따릅니다. Unreal Engine 엔진과 Epic Games가 제공한 콘텐츠는 이 라이선스에 포함되지 않으며 [Unreal Engine EULA](https://www.unrealengine.com/eula)를 따릅니다.

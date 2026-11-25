@@ -25,3 +25,25 @@ Script/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Unreal user-local content & logs
+Content/Developers/
+Content/Collections/
+*.log
+*.tmp
+
+# Environment variables, secrets & local agent workspaces
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*credential*
+*secret*
+*.local
+*.local.md
+.agents/
+.claude/
+.collab/
+.gemini/

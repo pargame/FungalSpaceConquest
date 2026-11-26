@@ -21,7 +21,7 @@
 3. Unreal Editor 5.9가 열리면 기본 시작 맵(`/Game/Sandbox/MiniProject/Maps/Lvl_Main`)에서 **Play (PIE)** 실행
 
 > 블루프린트/레벨 에셋의 `/Script/UEStudy` C++ 모듈 참조 호환을 위해 프로젝트 파일 및 모듈명은 `UEStudy`를 유지합니다.
-> 상세 아키텍처는 [ARCHITECTURE.md](Source/UEStudy/Sandbox/MiniProject/ARCHITECTURE.md)를 참고하세요.
+> 상세 아키텍처는 [Docs/ARCHITECTURE.md](Docs/ARCHITECTURE.md)를 참고하세요.
 
 ## 라이선스
 
